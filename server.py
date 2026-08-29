@@ -23,10 +23,12 @@ async def root():
     return FileResponse(os.path.join(BASE_DIR, "dashboard.html"))
 
 @app.get("/dashboard")
+@app.get("/dashboard.html")
 async def get_dashboard():
     return FileResponse(os.path.join(BASE_DIR, "dashboard.html"))
 
 @app.get("/target")
+@app.get("/target_web.html")
 async def get_target():
     return FileResponse(os.path.join(BASE_DIR, "target_web.html"))
 

