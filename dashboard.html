@@ -405,7 +405,7 @@
             });
         }
 
-        // WebRTC Config with low-latency candidate pooling & geo-distributed STUN
+        // WebRTC Config with low-latency candidate pooling, STUN & TURN relay fallback
         const rtcConfig = {
             iceServers: [
                 { urls: "stun:stun.cloudflare.com:3478" },
@@ -413,10 +413,17 @@
                 { urls: "stun:stun1.l.google.com:19302" },
                 { urls: "stun:stun2.l.google.com:19302" },
                 { urls: "stun:stun3.l.google.com:19302" },
-                { urls: "stun:stun4.l.google.com:19302" }
+                { urls: "stun:stun4.l.google.com:19302" },
+                {
+                    urls: [
+                        "turn:openrelay.metered.ca:80",
+                        "turn:openrelay.metered.ca:443",
+                        "turn:openrelay.metered.ca:443?transport=tcp"
+                    ],
+                    username: "openrelay",
+                    credential: "openrelay"
+                }
             ],
-            bundlePolicy: "max-bundle",
-            rtcpMuxPolicy: "require",
             iceCandidatePoolSize: 10
         };
 
@@ -521,16 +528,16 @@
                     <span class="target-status-badge" id="badge-${targetId}">CONNECTING</span>
                 </div>
                 <div class="target-video-wrapper">
-                    <video id="video-${targetId}" autoplay playsinline></video>
+                    <video id="video-${targetId}" autoplay playsinline muted></video>
                     <div class="video-overlay-loader" id="loader-${targetId}">
                         <div class="dot" style="animation-duration: 0.8s;"></div>
-                        <span>Negotiating Fast Stream...</span>
+                        <span>Connecting Video Stream...</span>
                     </div>
                 </div>
                 <div class="target-card-footer">
                     <span id="time-${targetId}">Connected just now</span>
                     <div style="display: flex; gap: 8px;">
-                        <button class="btn-action" onclick="toggleMute('${targetId}')">Mute / Unmute</button>
+                        <button class="btn-action" id="muteBtn-${targetId}" onclick="toggleMute('${targetId}')">Unmute Audio</button>
                         <button class="btn-action" onclick="fullscreenVideo('${targetId}')">Fullscreen</button>
                     </div>
                 </div>
@@ -542,8 +549,12 @@
             const badgeEl = card.querySelector(`#badge-${targetId}`);
 
             const pc = new RTCPeerConnection(rtcConfig);
+            const mediaStream = new MediaStream();
+            videoEl.srcObject = mediaStream;
+
             const targetSession = {
                 pc,
+                mediaStream,
                 pendingIce: [],
                 cardEl: card,
                 videoEl,
@@ -557,14 +568,14 @@
             pc.addTransceiver('video', { direction: 'recvonly' });
             pc.addTransceiver('audio', { direction: 'recvonly' });
 
+            // Handle incoming media tracks reliably
             pc.ontrack = (event) => {
-                if (event.streams && event.streams[0]) {
-                    videoEl.srcObject = event.streams[0];
-                    loaderEl.style.display = 'none';
-                    badgeEl.innerText = 'LIVE STREAMING';
-                    badgeEl.style.color = '#10b981';
-                    console.log(`[+] Stream attached for target: ${targetId}`);
-                }
+                console.log(`[+] Track received for ${targetId}:`, event.track.kind);
+                mediaStream.addTrack(event.track);
+                loaderEl.style.display = 'none';
+                badgeEl.innerText = 'LIVE STREAMING';
+                badgeEl.style.color = '#10b981';
+                videoEl.play().catch(e => console.log('Autoplay play error:', e));
             };
 
             pc.onicecandidate = (event) => {
@@ -582,8 +593,9 @@
                 if (pc.connectionState === "connected") {
                     loaderEl.style.display = 'none';
                     badgeEl.innerText = 'LIVE STREAMING';
+                    badgeEl.style.color = '#10b981';
                 } else if (pc.connectionState === "failed" || pc.connectionState === "disconnected") {
-                    badgeEl.innerText = 'OFFLINE';
+                    badgeEl.innerText = 'OFFLINE / RETRYING';
                     badgeEl.style.color = '#ef4444';
                 }
             };
@@ -619,8 +631,10 @@
 
         function toggleMute(targetId) {
             const video = document.getElementById(`video-${targetId}`);
-            if (video) {
+            const btn = document.getElementById(`muteBtn-${targetId}`);
+            if (video && btn) {
                 video.muted = !video.muted;
+                btn.innerText = video.muted ? "Unmute Audio" : "Mute Audio";
             }
         }
 
