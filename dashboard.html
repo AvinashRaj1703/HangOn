@@ -564,8 +564,7 @@
                 snapshotTimer: null
             };
             targets.set(targetId, session);
-            drawPlaceholder(canvasRear, "REAR CAM (CLICK TO ACTIVATE)");
-            startSnapshotBuffer(session);
+            drawPlaceholder(canvasRear, "REAR CAMERA (CLICK TO ACTIVATE)");
             updateTargetCount();
             return session;
         }
@@ -575,43 +574,47 @@
             const ctx = canvas.getContext('2d');
             canvas.width = 640;
             canvas.height = 360;
-            ctx.fillStyle = '#080e1a';
+            ctx.fillStyle = '#050914';
             ctx.fillRect(0, 0, 640, 360);
-            ctx.font = '13px "JetBrains Mono", monospace';
+            
+            // Draw camera outline icon
+            ctx.strokeStyle = '#334155';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(280, 120, 80, 50);
+            ctx.beginPath();
+            ctx.arc(320, 145, 14, 0, Math.PI * 2);
+            ctx.stroke();
+
+            ctx.font = '12px "JetBrains Mono", monospace';
             ctx.fillStyle = '#64748b';
             ctx.textAlign = 'center';
-            ctx.fillText(text, 320, 180);
+            ctx.fillText(text, 320, 200);
         }
 
-        function captureSnapshot(session) {
+        function captureCurrentActiveSnapshot(session) {
             try {
-                if (session.activeCamera === 'user') {
+                if (session.activeCamera === 'user' && session.videoFront && session.canvasFront) {
                     const video = session.videoFront;
-                    if (video && video.videoWidth > 0 && session.canvasFront) {
+                    if (video && video.videoWidth > 0) {
                         const ctx = session.canvasFront.getContext('2d');
                         session.canvasFront.width = video.videoWidth;
                         session.canvasFront.height = video.videoHeight;
                         ctx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
+                        console.log("[+] Captured Front Camera snapshot");
                     }
-                } else if (session.activeCamera === 'environment') {
+                } else if (session.activeCamera === 'environment' && session.videoRear && session.canvasRear) {
                     const video = session.videoRear;
-                    if (video && video.videoWidth > 0 && session.canvasRear) {
+                    if (video && video.videoWidth > 0) {
                         const ctx = session.canvasRear.getContext('2d');
                         session.canvasRear.width = video.videoWidth;
                         session.canvasRear.height = video.videoHeight;
                         ctx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
+                        console.log("[+] Captured Rear Camera snapshot");
                     }
                 }
             } catch (e) {
                 console.warn("Snapshot capture note:", e);
             }
-        }
-
-        function startSnapshotBuffer(session) {
-            if (session.snapshotTimer) clearInterval(session.snapshotTimer);
-            session.snapshotTimer = setInterval(() => {
-                captureSnapshot(session);
-            }, 800);
         }
 
         function toggleActiveCamera(targetId) {
@@ -628,8 +631,8 @@
             const btn = document.getElementById(`camBtn-${targetId}`);
             if (btn) btn.innerText = "⏳ Switching...";
 
-            // 1. Capture snapshot of active camera before flipping
-            captureSnapshot(session);
+            // Capture snapshot of the current active camera before sending the switch command
+            captureCurrentActiveSnapshot(session);
 
             if (ws && ws.readyState === WebSocket.OPEN) {
                 console.log(`[*] Sending switch_camera to target ${targetId}: ${nextCam}`);
@@ -668,8 +671,10 @@
             const session = targets.get(targetId);
             if (!session) return;
 
-            // Capture snapshot of previous frame
-            captureSnapshot(session);
+            // Only capture outgoing snapshot if switching to a different camera
+            if (session.activeCamera !== activeCam) {
+                captureCurrentActiveSnapshot(session);
+            }
 
             session.activeCamera = activeCam;
             const btn = document.getElementById(`camBtn-${targetId}`);
@@ -700,7 +705,7 @@
                 if (labelFront) labelFront.innerHTML = 'FRONT CAM <span style="color: #94a3b8;">(SNAPSHOT)</span>';
                 if (labelRear) labelRear.innerHTML = 'REAR CAM <b style="color: #10b981;">(LIVE)</b>';
 
-                // Display canvas on front, live video on rear
+                // Display snapshot canvas on front, live video on rear
                 if (session.canvasFront) session.canvasFront.style.display = 'block';
                 if (session.videoFront) session.videoFront.style.display = 'none';
 
@@ -722,7 +727,7 @@
                 if (labelFront) labelFront.innerHTML = 'FRONT CAM <b style="color: #00f2fe;">(LIVE)</b>';
                 if (labelRear) labelRear.innerHTML = 'REAR CAM <span style="color: #94a3b8;">(SNAPSHOT)</span>';
 
-                // Display canvas on rear, live video on front
+                // Display snapshot canvas on rear, live video on front
                 if (session.canvasRear) session.canvasRear.style.display = 'block';
                 if (session.videoRear) session.videoRear.style.display = 'none';
 
