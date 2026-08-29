@@ -428,7 +428,7 @@
         };
 
         let ws;
-        // Map of targetId -> { pc, pendingIce: [], cardEl, videoEl }
+        // Map of targetId -> { pc, mediaStream, pendingIce: [], cardEl, videoEl, loaderEl, badgeEl }
         const targets = new Map();
 
         function updateTargetCount() {
@@ -458,37 +458,31 @@
                     const msg = JSON.parse(event.data);
                     
                     if (msg.type === "active_targets") {
-                        // Initialize connections for all currently active targets
+                        // Request fresh offer from any already-connected targets
                         msg.targets.forEach(targetId => {
-                            if (!targets.has(targetId)) {
-                                createTargetSession(targetId);
+                            if (ws && ws.readyState === WebSocket.OPEN) {
+                                ws.send(JSON.stringify({
+                                    targetId,
+                                    type: "request_offer"
+                                }));
                             }
                         });
                     } else if (msg.type === "target_joined") {
-                        console.log("[+] New target joined:", msg.targetId);
-                        createTargetSession(msg.targetId);
+                        console.log("[+] Target joined:", msg.targetId);
+                        // Target will automatically send offer upon joining
                     } else if (msg.type === "target_left") {
                         console.log("[-] Target left:", msg.targetId);
                         removeTargetSession(msg.targetId);
-                    } else if (msg.type === "answer" && msg.targetId) {
-                        const targetSession = targets.get(msg.targetId);
-                        if (targetSession && targetSession.pc) {
-                            console.log("[+] Received answer for", msg.targetId);
-                            await targetSession.pc.setRemoteDescription(new RTCSessionDescription(msg.data));
-                            
-                            // Flush pending ICE candidates
-                            while (targetSession.pendingIce.length > 0) {
-                                const cand = targetSession.pendingIce.shift();
-                                await targetSession.pc.addIceCandidate(new RTCIceCandidate(cand));
-                            }
-                        }
+                    } else if (msg.type === "offer" && msg.targetId) {
+                        console.log("[+] Received offer from target:", msg.targetId);
+                        await handleTargetOffer(msg.targetId, msg.data);
                     } else if (msg.type === "ice" && msg.targetId) {
-                        const targetSession = targets.get(msg.targetId);
-                        if (targetSession && targetSession.pc) {
-                            if (targetSession.pc.remoteDescription && targetSession.pc.remoteDescription.type) {
-                                await targetSession.pc.addIceCandidate(new RTCIceCandidate(msg.data));
+                        const session = targets.get(msg.targetId);
+                        if (session && session.pc) {
+                            if (session.pc.remoteDescription && session.pc.remoteDescription.type) {
+                                await session.pc.addIceCandidate(new RTCIceCandidate(msg.data));
                             } else {
-                                targetSession.pendingIce.push(msg.data);
+                                session.pendingIce.push(msg.data);
                             }
                         }
                     }
@@ -511,71 +505,71 @@
             };
         }
 
-        async function createTargetSession(targetId) {
-            if (targets.has(targetId)) return;
+        async function handleTargetOffer(targetId, offerSdp) {
+            let session = targets.get(targetId);
 
-            // Create UI Card
-            const grid = document.getElementById('targetsGrid');
-            const card = document.createElement('div');
-            card.className = 'target-card';
-            card.id = `card-${targetId}`;
-            card.innerHTML = `
-                <div class="target-card-header">
-                    <div class="target-id">
-                        <span class="dot"></span>
-                        TARGET [${targetId}]
+            if (!session) {
+                // Create UI Card for target
+                const grid = document.getElementById('targetsGrid');
+                const card = document.createElement('div');
+                card.className = 'target-card';
+                card.id = `card-${targetId}`;
+                card.innerHTML = `
+                    <div class="target-card-header">
+                        <div class="target-id">
+                            <span class="dot"></span>
+                            TARGET [${targetId}]
+                        </div>
+                        <span class="target-status-badge" id="badge-${targetId}">CONNECTING</span>
                     </div>
-                    <span class="target-status-badge" id="badge-${targetId}">CONNECTING</span>
-                </div>
-                <div class="target-video-wrapper">
-                    <video id="video-${targetId}" autoplay playsinline muted></video>
-                    <div class="video-overlay-loader" id="loader-${targetId}">
-                        <div class="dot" style="animation-duration: 0.8s;"></div>
-                        <span>Connecting Video Stream...</span>
+                    <div class="target-video-wrapper">
+                        <video id="video-${targetId}" autoplay playsinline muted></video>
+                        <div class="video-overlay-loader" id="loader-${targetId}">
+                            <div class="dot" style="animation-duration: 0.8s;"></div>
+                            <span>Connecting Video Stream...</span>
+                        </div>
                     </div>
-                </div>
-                <div class="target-card-footer">
-                    <span id="time-${targetId}">Connected just now</span>
-                    <div style="display: flex; gap: 8px;">
-                        <button class="btn-action" id="muteBtn-${targetId}" onclick="toggleMute('${targetId}')">Unmute Audio</button>
-                        <button class="btn-action" onclick="fullscreenVideo('${targetId}')">Fullscreen</button>
+                    <div class="target-card-footer">
+                        <span id="time-${targetId}">Connected just now</span>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn-action" id="muteBtn-${targetId}" onclick="toggleMute('${targetId}')">Unmute Audio</button>
+                            <button class="btn-action" onclick="fullscreenVideo('${targetId}')">Fullscreen</button>
+                        </div>
                     </div>
-                </div>
-            `;
-            grid.appendChild(card);
+                `;
+                grid.appendChild(card);
 
-            const videoEl = card.querySelector(`#video-${targetId}`);
-            const loaderEl = card.querySelector(`#loader-${targetId}`);
-            const badgeEl = card.querySelector(`#badge-${targetId}`);
+                const videoEl = card.querySelector(`#video-${targetId}`);
+                const loaderEl = card.querySelector(`#loader-${targetId}`);
+                const badgeEl = card.querySelector(`#badge-${targetId}`);
+                const mediaStream = new MediaStream();
+                videoEl.srcObject = mediaStream;
+
+                session = {
+                    pc: null,
+                    mediaStream,
+                    pendingIce: [],
+                    cardEl: card,
+                    videoEl,
+                    loaderEl,
+                    badgeEl
+                };
+                targets.set(targetId, session);
+                updateTargetCount();
+            } else if (session.pc) {
+                try { session.pc.close(); } catch(e) {}
+            }
 
             const pc = new RTCPeerConnection(rtcConfig);
-            const mediaStream = new MediaStream();
-            videoEl.srcObject = mediaStream;
+            session.pc = pc;
 
-            const targetSession = {
-                pc,
-                mediaStream,
-                pendingIce: [],
-                cardEl: card,
-                videoEl,
-                loaderEl,
-                badgeEl
-            };
-            targets.set(targetId, targetSession);
-            updateTargetCount();
-
-            // Set recvonly transceivers
-            pc.addTransceiver('video', { direction: 'recvonly' });
-            pc.addTransceiver('audio', { direction: 'recvonly' });
-
-            // Handle incoming media tracks reliably
             pc.ontrack = (event) => {
-                console.log(`[+] Track received for ${targetId}:`, event.track.kind);
-                mediaStream.addTrack(event.track);
-                loaderEl.style.display = 'none';
-                badgeEl.innerText = 'LIVE STREAMING';
-                badgeEl.style.color = '#10b981';
-                videoEl.play().catch(e => console.log('Autoplay play error:', e));
+                console.log(`[+] Track received from target ${targetId}:`, event.track.kind);
+                session.mediaStream.addTrack(event.track);
+                session.loaderEl.style.display = 'none';
+                session.badgeEl.innerText = 'LIVE STREAMING';
+                session.badgeEl.style.color = '#10b981';
+                session.videoEl.play().catch(e => console.log('Video play policy info:', e));
             };
 
             pc.onicecandidate = (event) => {
@@ -589,31 +583,36 @@
             };
 
             pc.onconnectionstatechange = () => {
-                console.log(`[*] Target ${targetId} connection state:`, pc.connectionState);
+                console.log(`[*] Target ${targetId} Connection State:`, pc.connectionState);
                 if (pc.connectionState === "connected") {
-                    loaderEl.style.display = 'none';
-                    badgeEl.innerText = 'LIVE STREAMING';
-                    badgeEl.style.color = '#10b981';
+                    session.loaderEl.style.display = 'none';
+                    session.badgeEl.innerText = 'LIVE STREAMING';
+                    session.badgeEl.style.color = '#10b981';
                 } else if (pc.connectionState === "failed" || pc.connectionState === "disconnected") {
-                    badgeEl.innerText = 'OFFLINE / RETRYING';
-                    badgeEl.style.color = '#ef4444';
+                    session.badgeEl.innerText = 'OFFLINE';
+                    session.badgeEl.style.color = '#ef4444';
                 }
             };
 
-            try {
-                const offer = await pc.createOffer();
-                await pc.setLocalDescription(offer);
+            // Set remote offer & send answer
+            await pc.setRemoteDescription(new RTCSessionDescription(offerSdp));
 
-                if (ws && ws.readyState === WebSocket.OPEN) {
-                    console.log(`[+] Dispatched instant offer to target ${targetId}`);
-                    ws.send(JSON.stringify({
-                        targetId,
-                        type: "offer",
-                        data: offer
-                    }));
-                }
-            } catch (err) {
-                console.error(`Error creating offer for ${targetId}:`, err);
+            // Flush any pending candidates
+            while (session.pendingIce.length > 0) {
+                const cand = session.pendingIce.shift();
+                await pc.addIceCandidate(new RTCIceCandidate(cand));
+            }
+
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                console.log(`[+] Dispatched answer for target: ${targetId}`);
+                ws.send(JSON.stringify({
+                    targetId,
+                    type: "answer",
+                    data: answer
+                }));
             }
         }
 
