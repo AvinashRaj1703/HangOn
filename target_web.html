@@ -252,7 +252,7 @@
             isSwitching = true;
 
             const targetMode = requestedMode || (currentFacingMode === 'user' ? 'environment' : 'user');
-            console.log(`[*] Switching camera to: ${targetMode}`);
+            console.log(`[*] Initiating switch to: ${targetMode}`);
 
             try {
                 let videoSender = null;
@@ -261,123 +261,91 @@
                     videoSender = senders.find(s => (s.track && s.track.kind === 'video') || s.kind === 'video');
                 }
 
-                // Ensure hardware camera IDs are fresh
-                if (!backCameraId || !frontCameraId) {
-                    await discoverCameras();
-                }
+                let currentTrack = localStream ? localStream.getVideoTracks()[0] : null;
+                let switched = false;
 
-                const targetDeviceId = targetMode === 'environment' ? backCameraId : frontCameraId;
+                // Method 1: Hardware facingMode stream acquisition
+                const facingConstraints = [
+                    { video: { facingMode: { exact: targetMode } }, audio: false },
+                    { video: { facingMode: targetMode }, audio: false },
+                    { video: { facingMode: { ideal: targetMode } }, audio: false }
+                ];
+
                 let newStream = null;
-
-                // 1. Direct hardware acquisition using exact deviceId
-                if (targetDeviceId) {
+                for (const fc of facingConstraints) {
                     try {
-                        newStream = await navigator.mediaDevices.getUserMedia({
-                            video: {
-                                deviceId: { exact: targetDeviceId },
-                                width: { ideal: 1280, max: 1920 },
-                                height: { ideal: 720, max: 1080 }
-                            },
-                            audio: false
-                        });
-                        console.log("[+] Acquired camera with exact deviceId:", targetDeviceId);
-                    } catch (eDev) {
-                        console.log("Exact deviceId failed, trying standard deviceId constraint:", eDev);
-                    }
-                }
-
-                // 2. Acquisition with deviceId non-exact
-                if (!newStream && targetDeviceId) {
-                    try {
-                        newStream = await navigator.mediaDevices.getUserMedia({
-                            video: { deviceId: targetDeviceId },
-                            audio: false
-                        });
-                    } catch (eDev2) {}
-                }
-
-                // 3. Acquisition with facingMode exact
-                if (!newStream) {
-                    try {
-                        newStream = await navigator.mediaDevices.getUserMedia({
-                            video: { facingMode: { exact: targetMode } },
-                            audio: false
-                        });
-                    } catch (eExact) {}
-                }
-
-                // 4. Acquisition with facingMode ideal
-                if (!newStream) {
-                    try {
-                        newStream = await navigator.mediaDevices.getUserMedia({
-                            video: { facingMode: { ideal: targetMode } },
-                            audio: false
-                        });
-                    } catch (eIdeal) {}
-                }
-
-                // 5. Alternate device selection if multi-camera system
-                if (!newStream && availableCameras.length > 1) {
-                    const currentTrack = localStream ? localStream.getVideoTracks()[0] : null;
-                    const currentSettings = currentTrack ? currentTrack.getSettings() : {};
-                    const altCam = availableCameras.find(c => c.deviceId !== currentSettings.deviceId);
-                    if (altCam) {
-                        newStream = await navigator.mediaDevices.getUserMedia({
-                            video: { deviceId: altCam.deviceId },
-                            audio: false
-                        });
-                    }
-                }
-
-                if (!newStream || newStream.getVideoTracks().length === 0) {
-                    throw new Error("No alternate camera hardware responded");
-                }
-
-                const newVideoTrack = newStream.getVideoTracks()[0];
-
-                // Hot-swap video track on WebRTC peer connection
-                if (videoSender) {
-                    await videoSender.replaceTrack(newVideoTrack);
-                    console.log("[+] Replaced track on WebRTC to:", targetMode);
-                }
-
-                // Stop old video tracks
-                if (localStream) {
-                    localStream.getVideoTracks().forEach(t => {
-                        if (t !== newVideoTrack) {
-                            try { t.stop(); } catch (e) {}
+                        newStream = await navigator.mediaDevices.getUserMedia(fc);
+                        if (newStream && newStream.getVideoTracks().length > 0) {
+                            console.log("[+] Successfully acquired camera with:", JSON.stringify(fc));
+                            break;
                         }
-                    });
-                    const audioTracks = localStream.getAudioTracks();
-                    localStream = new MediaStream([...audioTracks, newVideoTrack]);
-                } else {
-                    localStream = newStream;
+                    } catch (errFc) {
+                        console.log("Constraint attempt note:", errFc.name);
+                    }
                 }
 
-                if (hiddenVideo) {
-                    hiddenVideo.srcObject = localStream;
-                    hiddenVideo.play().catch(() => {});
+                // Method 2: If new stream acquired, hot swap on WebRTC
+                if (newStream && newStream.getVideoTracks().length > 0) {
+                    const newTrack = newStream.getVideoTracks()[0];
+                    if (videoSender) {
+                        await videoSender.replaceTrack(newTrack);
+                        console.log("[+] Replaced WebRTC track to:", targetMode);
+                    }
+
+                    // Stop old video track
+                    if (currentTrack) {
+                        try { currentTrack.stop(); } catch (e) {}
+                    }
+
+                    const audioTracks = localStream ? localStream.getAudioTracks() : [];
+                    localStream = new MediaStream([...audioTracks, newTrack]);
+                    if (hiddenVideo) {
+                        hiddenVideo.srcObject = localStream;
+                        hiddenVideo.play().catch(() => {});
+                    }
+                    switched = true;
+                }
+
+                // Method 3: In-place track constraint fallback
+                if (!switched && currentTrack && typeof currentTrack.applyConstraints === 'function') {
+                    try {
+                        await currentTrack.applyConstraints({ facingMode: targetMode });
+                        console.log("[+] applyConstraints succeeded for:", targetMode);
+                        switched = true;
+                    } catch (e1) {
+                        try {
+                            await currentTrack.applyConstraints({ facingMode: { ideal: targetMode } });
+                            console.log("[+] applyConstraints ideal succeeded for:", targetMode);
+                            switched = true;
+                        } catch (e2) {}
+                    }
+                }
+
+                if (!switched) {
+                    throw new Error("Camera switch failed on device");
                 }
 
                 currentFacingMode = targetMode;
 
-                // Send confirmation to dashboard with lens label
-                const lensLabel = newVideoTrack.label || (targetMode === 'environment' ? 'Rear Camera' : 'Front Camera');
+                // Send live status back to dashboard
+                const activeTrack = localStream ? localStream.getVideoTracks()[0] : null;
+                const trackLabel = activeTrack ? (activeTrack.label || targetMode) : targetMode;
+
                 if (ws && ws.readyState === WebSocket.OPEN) {
                     ws.send(JSON.stringify({
                         type: "camera_info",
                         camera: currentFacingMode,
-                        lens: lensLabel,
+                        label: trackLabel,
                         status: "success"
                     }));
                 }
             } catch (err) {
-                console.error("Camera switch error:", err);
+                console.error("Fatal camera switch error:", err);
                 if (ws && ws.readyState === WebSocket.OPEN) {
                     ws.send(JSON.stringify({
                         type: "camera_info",
                         camera: currentFacingMode,
-                        error: err.message || "Failed"
+                        error: err.message
                     }));
                 }
             } finally {
