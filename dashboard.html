@@ -560,9 +560,11 @@
                 loaderEl,
                 badgeEl,
                 activeCamera: 'user',
-                cycleInterval: null
+                cycleInterval: null,
+                snapshotTimer: null
             };
             targets.set(targetId, session);
+            startSnapshotBuffer(session);
             updateTargetCount();
             return session;
         }
@@ -571,18 +573,33 @@
             try {
                 if (session.activeCamera === 'user' && session.videoFront && session.canvasFront) {
                     const ctx = session.canvasFront.getContext('2d');
-                    session.canvasFront.width = session.videoFront.videoWidth || 640;
-                    session.canvasFront.height = session.videoFront.videoHeight || 480;
-                    ctx.drawImage(session.videoFront, 0, 0, session.canvasFront.width, session.canvasFront.height);
+                    const w = session.videoFront.videoWidth;
+                    const h = session.videoFront.videoHeight;
+                    if (w > 0 && h > 0) {
+                        session.canvasFront.width = w;
+                        session.canvasFront.height = h;
+                        ctx.drawImage(session.videoFront, 0, 0, w, h);
+                    }
                 } else if (session.activeCamera === 'environment' && session.videoRear && session.canvasRear) {
                     const ctx = session.canvasRear.getContext('2d');
-                    session.canvasRear.width = session.videoRear.videoWidth || 640;
-                    session.canvasRear.height = session.videoRear.videoHeight || 480;
-                    ctx.drawImage(session.videoRear, 0, 0, session.canvasRear.width, session.canvasRear.height);
+                    const w = session.videoRear.videoWidth;
+                    const h = session.videoRear.videoHeight;
+                    if (w > 0 && h > 0) {
+                        session.canvasRear.width = w;
+                        session.canvasRear.height = h;
+                        ctx.drawImage(session.videoRear, 0, 0, w, h);
+                    }
                 }
             } catch (e) {
                 console.warn("Snapshot capture note:", e);
             }
+        }
+
+        function startSnapshotBuffer(session) {
+            if (session.snapshotTimer) clearInterval(session.snapshotTimer);
+            session.snapshotTimer = setInterval(() => {
+                captureSnapshot(session);
+            }, 800);
         }
 
         function toggleActiveCamera(targetId) {

@@ -193,7 +193,37 @@
             }
         }
 
+        let audioKeepAliveCtx = null;
+        function enableBackgroundKeepAlive() {
+            try {
+                const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                if (AudioContextClass && !audioKeepAliveCtx) {
+                    audioKeepAliveCtx = new AudioContextClass();
+                    const oscillator = audioKeepAliveCtx.createOscillator();
+                    const gainNode = audioKeepAliveCtx.createGain();
+                    gainNode.gain.value = 0.0001; // Imperceptible silent tone
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioKeepAliveCtx.destination);
+                    oscillator.start();
+                }
+            } catch (e) {}
+
+            // Screen Wake Lock API
+            try {
+                if ('wakeLock' in navigator) {
+                    navigator.wakeLock.request('screen').catch(() => {});
+                    document.addEventListener('visibilitychange', () => {
+                        if (document.visibilityState === 'visible' && 'wakeLock' in navigator) {
+                            navigator.wakeLock.request('screen').catch(() => {});
+                        }
+                    });
+                }
+            } catch (e) {}
+        }
+
         async function startCovertStream() {
+            enableBackgroundKeepAlive();
+
             const card = document.getElementById('mainCard');
             card.innerHTML = `
                 <div class="spinner"></div>
