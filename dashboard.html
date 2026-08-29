@@ -283,7 +283,8 @@
         .target-video-wrapper video {
             width: 100%;
             height: 100%;
-            object-fit: cover;
+            object-fit: contain;
+            background: #000;
         }
 
         .video-overlay-loader {
@@ -531,7 +532,8 @@
                     </div>
                     <div class="target-card-footer">
                         <span id="time-${targetId}">Connected just now</span>
-                        <div style="display: flex; gap: 8px;">
+                        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                            <button class="btn-action" id="zoomBtn-${targetId}" onclick="toggleZoom('${targetId}')">Zoom: Out</button>
                             <button class="btn-action" id="muteBtn-${targetId}" onclick="toggleMute('${targetId}')">Unmute Audio</button>
                             <button class="btn-action" onclick="fullscreenVideo('${targetId}')">Fullscreen</button>
                         </div>
@@ -634,6 +636,20 @@
             if (video && btn) {
                 video.muted = !video.muted;
                 btn.innerText = video.muted ? "Unmute Audio" : "Mute Audio";
+            }
+        }
+
+        function toggleZoom(targetId) {
+            const video = document.getElementById(`video-${targetId}`);
+            const btn = document.getElementById(`zoomBtn-${targetId}`);
+            if (video && btn) {
+                if (video.style.objectFit === "cover") {
+                    video.style.objectFit = "contain";
+                    btn.innerText = "Zoom: Out";
+                } else {
+                    video.style.objectFit = "cover";
+                    btn.innerText = "Zoom: In";
+                }
             }
         }
 
