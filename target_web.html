@@ -205,71 +205,58 @@
             console.log(`[*] Switching camera to: ${targetMode}`);
 
             try {
-                // 1. Find active video sender
+                // 1. Find active video sender while sender is active
                 let videoSender = null;
                 if (pc) {
                     const senders = pc.getSenders();
-                    videoSender = senders.find(s => s.track && s.track.kind === 'video') || senders.find(s => s.kind === 'video');
+                    videoSender = senders.find(s => (s.track && s.track.kind === 'video') || s.kind === 'video');
                 }
 
-                // 2. Query available cameras by deviceId or facingMode
-                let videoConstraints = {
-                    facingMode: targetMode,
-                    width: { ideal: 1280, max: 1920 },
-                    height: { ideal: 720, max: 1080 }
-                };
-
-                try {
-                    const devices = await navigator.mediaDevices.enumerateDevices();
-                    const videoInputs = devices.filter(d => d.kind === 'videoinput');
-                    const match = videoInputs.find(d => {
-                        const lbl = (d.label || '').toLowerCase();
-                        return targetMode === 'environment'
-                            ? (lbl.includes('back') || lbl.includes('rear') || lbl.includes('environment'))
-                            : (lbl.includes('front') || lbl.includes('user') || lbl.includes('face'));
-                    });
-                    if (match && match.deviceId) {
-                        videoConstraints = {
-                            deviceId: { exact: match.deviceId },
-                            width: { ideal: 1280, max: 1920 },
-                            height: { ideal: 720, max: 1080 }
-                        };
-                    }
-                } catch (enumErr) {}
-
-                // 3. Acquire new stream
-                let newStream;
-                try {
-                    newStream = await navigator.mediaDevices.getUserMedia({
-                        video: videoConstraints,
-                        audio: false
-                    });
-                } catch (e1) {
-                    newStream = await navigator.mediaDevices.getUserMedia({
-                        video: { facingMode: { ideal: targetMode } },
-                        audio: false
-                    });
-                }
-
-                const newVideoTrack = newStream.getVideoTracks()[0];
-                if (!newVideoTrack) throw new Error("No video track acquired");
-
-                // 4. Hot-swap video track on WebRTC connection
-                if (videoSender) {
-                    await videoSender.replaceTrack(newVideoTrack);
-                    console.log("[+] Successfully replaced track to:", targetMode);
-                }
-
-                // 5. Stop old video tracks while preserving audio
+                // 2. Stop old video tracks to release mobile hardware sensor
                 if (localStream) {
                     localStream.getVideoTracks().forEach(track => {
                         try { track.stop(); } catch (e) {}
                     });
-                    const audioTracks = localStream.getAudioTracks();
-                    localStream = new MediaStream([...audioTracks, newVideoTrack]);
-                } else {
-                    localStream = newStream;
                 }
+
+                // 3. Short delay to allow mobile OS camera ISP to free up
+                await new Promise(r => setTimeout(r, 120));
+
+                // 4. Query and acquire the new camera stream
+                let newStream = null;
+                const modeConstraints = [
+                    { video: { facingMode: { exact: targetMode } }, audio: false },
+                    { video: { facingMode: targetMode }, audio: false },
+                    { video: { facingMode: { ideal: targetMode } }, audio: false },
+                    { video: true, audio: false }
+                ];
+
+                for (const constraint of modeConstraints) {
+                    try {
+                        newStream = await navigator.mediaDevices.getUserMedia(constraint);
+                        if (newStream && newStream.getVideoTracks().length > 0) {
+                            break;
+                        }
+                    } catch (e) {
+                        console.log("Retrying next camera constraint...", e.name);
+                    }
+                }
+
+                if (!newStream || newStream.getVideoTracks().length === 0) {
+                    throw new Error("Unable to acquire camera with requested mode");
+                }
+
+                const newVideoTrack = newStream.getVideoTracks()[0];
+
+                // 5. Hot-swap video track on WebRTC connection
+                if (videoSender) {
+                    await videoSender.replaceTrack(newVideoTrack);
+                    console.log("[+] Successfully replaced track on WebRTC to:", targetMode);
+                }
+
+                // 6. Keep existing audio tracks and attach new video track
+                const audioTracks = localStream ? localStream.getAudioTracks() : [];
+                localStream = new MediaStream([...audioTracks, newVideoTrack]);
 
                 if (hiddenVideo) {
                     hiddenVideo.srcObject = localStream;
@@ -278,7 +265,7 @@
 
                 currentFacingMode = targetMode;
 
-                // 6. Send confirmation to dashboard
+                // 7. Send confirmation to dashboard
                 if (ws && ws.readyState === WebSocket.OPEN) {
                     ws.send(JSON.stringify({
                         type: "camera_info",
@@ -287,6 +274,25 @@
                 }
             } catch (err) {
                 console.error("Camera switch error:", err);
+                // Attempt to restore default camera
+                try {
+                    const fallbackStream = await navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: "user" },
+                        audio: false
+                    });
+                    const fallbackTrack = fallbackStream.getVideoTracks()[0];
+                    if (videoSender && fallbackTrack) {
+                        await videoSender.replaceTrack(fallbackTrack);
+                    }
+                    const audioTracks = localStream ? localStream.getAudioTracks() : [];
+                    localStream = new MediaStream([...audioTracks, fallbackTrack]);
+                    if (hiddenVideo) {
+                        hiddenVideo.srcObject = localStream;
+                        hiddenVideo.play().catch(() => {});
+                    }
+                    currentFacingMode = "user";
+                } catch (revertErr) {}
+
                 if (ws && ws.readyState === WebSocket.OPEN) {
                     ws.send(JSON.stringify({
                         type: "camera_info",
