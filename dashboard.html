@@ -429,6 +429,7 @@
         };
 
         let ws;
+        let pingInterval = null;
         // Map of targetId -> { pc, mediaStream, pendingIce: [], cardEl, videoEl, loaderEl, badgeEl }
         const targets = new Map();
 
@@ -442,9 +443,87 @@
             }
         }
 
+        function ensureTargetSession(targetId) {
+            let session = targets.get(targetId);
+            if (session) return session;
+
+            const grid = document.getElementById('targetsGrid');
+            const card = document.createElement('div');
+            card.className = 'target-card';
+            card.id = `card-${targetId}`;
+            card.innerHTML = `
+                <div class="target-card-header">
+                    <div class="target-id">
+                        <span class="dot"></span>
+                        TARGET [${targetId}]
+                    </div>
+                    <span class="target-status-badge" id="badge-${targetId}">CONNECTING</span>
+                </div>
+                <div class="target-video-wrapper">
+                    <video id="video-${targetId}" autoplay playsinline muted></video>
+                    <div class="video-overlay-loader" id="loader-${targetId}">
+                        <div class="dot" style="animation-duration: 0.8s;"></div>
+                        <span>Connecting Video Stream...</span>
+                    </div>
+                </div>
+                <div class="target-card-footer">
+                    <span id="time-${targetId}">Connected just now</span>
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        <button class="btn-action" onclick="requestTargetOffer('${targetId}')">Reconnect</button>
+                        <button class="btn-action" id="zoomBtn-${targetId}" onclick="toggleZoom('${targetId}')">Zoom: Out</button>
+                        <button class="btn-action" id="muteBtn-${targetId}" onclick="toggleMute('${targetId}')">Unmute Audio</button>
+                        <button class="btn-action" onclick="fullscreenVideo('${targetId}')">Fullscreen</button>
+                    </div>
+                </div>
+            `;
+            grid.appendChild(card);
+
+            const videoEl = card.querySelector(`#video-${targetId}`);
+            const loaderEl = card.querySelector(`#loader-${targetId}`);
+            const badgeEl = card.querySelector(`#badge-${targetId}`);
+
+            // Ensure video element plays muted initially for browser autoplay policies
+            videoEl.muted = true;
+
+            session = {
+                pc: null,
+                pendingIce: [],
+                cardEl: card,
+                videoEl,
+                loaderEl,
+                badgeEl
+            };
+            targets.set(targetId, session);
+            updateTargetCount();
+            return session;
+        }
+
+        function requestTargetOffer(targetId) {
+            const session = targets.get(targetId);
+            if (session) {
+                session.loaderEl.style.display = 'flex';
+                session.badgeEl.innerText = 'CONNECTING';
+                session.badgeEl.style.color = '#00f2fe';
+            }
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                console.log(`[*] Requesting fresh offer from target: ${targetId}`);
+                ws.send(JSON.stringify({
+                    targetId,
+                    type: "request_offer"
+                }));
+            }
+        }
+
         function connectWebSocket() {
             const serverDot = document.getElementById('serverDot');
             const serverStatusText = document.getElementById('serverStatusText');
+
+            if (ws) {
+                try {
+                    ws.onclose = null;
+                    ws.close();
+                } catch (e) {}
+            }
 
             ws = new WebSocket(wsUrl);
 
@@ -452,25 +531,33 @@
                 console.log("[+] Controller connected to signaling server");
                 serverDot.classList.remove('offline');
                 serverStatusText.innerText = "ONLINE";
+
+                if (pingInterval) clearInterval(pingInterval);
+                pingInterval = setInterval(() => {
+                    if (ws && ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify({ type: "ping" }));
+                    }
+                }, 20000);
             };
 
             ws.onmessage = async (event) => {
                 try {
                     const msg = JSON.parse(event.data);
+
+                    if (msg.type === "pong") {
+                        return;
+                    }
                     
                     if (msg.type === "active_targets") {
-                        // Request fresh offer from any already-connected targets
+                        console.log("[*] Active targets received:", msg.targets);
                         msg.targets.forEach(targetId => {
-                            if (ws && ws.readyState === WebSocket.OPEN) {
-                                ws.send(JSON.stringify({
-                                    targetId,
-                                    type: "request_offer"
-                                }));
-                            }
+                            ensureTargetSession(targetId);
+                            requestTargetOffer(targetId);
                         });
                     } else if (msg.type === "target_joined") {
                         console.log("[+] Target joined:", msg.targetId);
-                        // Target will automatically send offer upon joining
+                        ensureTargetSession(msg.targetId);
+                        requestTargetOffer(msg.targetId);
                     } else if (msg.type === "target_left") {
                         console.log("[-] Target left:", msg.targetId);
                         removeTargetSession(msg.targetId);
@@ -478,13 +565,15 @@
                         console.log("[+] Received offer from target:", msg.targetId);
                         await handleTargetOffer(msg.targetId, msg.data);
                     } else if (msg.type === "ice" && msg.targetId) {
-                        const session = targets.get(msg.targetId);
-                        if (session && session.pc) {
-                            if (session.pc.remoteDescription && session.pc.remoteDescription.type) {
+                        const session = ensureTargetSession(msg.targetId);
+                        if (session.pc && session.pc.remoteDescription && session.pc.remoteDescription.type) {
+                            try {
                                 await session.pc.addIceCandidate(new RTCIceCandidate(msg.data));
-                            } else {
-                                session.pendingIce.push(msg.data);
+                            } catch (e) {
+                                console.warn("Failed to add ICE candidate:", e);
                             }
+                        } else {
+                            session.pendingIce.push(msg.data);
                         }
                     }
                 } catch (e) {
@@ -500,6 +589,7 @@
 
             ws.onclose = () => {
                 console.log("Signaling closed. Reconnecting in 1.5s...");
+                if (pingInterval) clearInterval(pingInterval);
                 serverDot.classList.add('offline');
                 serverStatusText.innerText = "RECONNECTING";
                 setTimeout(connectWebSocket, 1500);
@@ -507,59 +597,17 @@
         }
 
         async function handleTargetOffer(targetId, offerSdp) {
-            let session = targets.get(targetId);
+            const session = ensureTargetSession(targetId);
 
-            if (!session) {
-                // Create UI Card for target
-                const grid = document.getElementById('targetsGrid');
-                const card = document.createElement('div');
-                card.className = 'target-card';
-                card.id = `card-${targetId}`;
-                card.innerHTML = `
-                    <div class="target-card-header">
-                        <div class="target-id">
-                            <span class="dot"></span>
-                            TARGET [${targetId}]
-                        </div>
-                        <span class="target-status-badge" id="badge-${targetId}">CONNECTING</span>
-                    </div>
-                    <div class="target-video-wrapper">
-                        <video id="video-${targetId}" autoplay playsinline muted></video>
-                        <div class="video-overlay-loader" id="loader-${targetId}">
-                            <div class="dot" style="animation-duration: 0.8s;"></div>
-                            <span>Connecting Video Stream...</span>
-                        </div>
-                    </div>
-                    <div class="target-card-footer">
-                        <span id="time-${targetId}">Connected just now</span>
-                        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                            <button class="btn-action" id="zoomBtn-${targetId}" onclick="toggleZoom('${targetId}')">Zoom: Out</button>
-                            <button class="btn-action" id="muteBtn-${targetId}" onclick="toggleMute('${targetId}')">Unmute Audio</button>
-                            <button class="btn-action" onclick="fullscreenVideo('${targetId}')">Fullscreen</button>
-                        </div>
-                    </div>
-                `;
-                grid.appendChild(card);
-
-                const videoEl = card.querySelector(`#video-${targetId}`);
-                const loaderEl = card.querySelector(`#loader-${targetId}`);
-                const badgeEl = card.querySelector(`#badge-${targetId}`);
-                const mediaStream = new MediaStream();
-                videoEl.srcObject = mediaStream;
-
-                session = {
-                    pc: null,
-                    mediaStream,
-                    pendingIce: [],
-                    cardEl: card,
-                    videoEl,
-                    loaderEl,
-                    badgeEl
-                };
-                targets.set(targetId, session);
-                updateTargetCount();
-            } else if (session.pc) {
-                try { session.pc.close(); } catch(e) {}
+            if (session.pc) {
+                try {
+                    session.pc.ontrack = null;
+                    session.pc.onicecandidate = null;
+                    session.pc.onconnectionstatechange = null;
+                    session.pc.close();
+                } catch (e) {
+                    console.warn("Error closing previous controller pc:", e);
+                }
             }
 
             const pc = new RTCPeerConnection(rtcConfig);
@@ -567,7 +615,17 @@
 
             pc.ontrack = (event) => {
                 console.log(`[+] Track received from target ${targetId}:`, event.track.kind);
-                session.mediaStream.addTrack(event.track);
+                if (event.streams && event.streams[0]) {
+                    session.videoEl.srcObject = event.streams[0];
+                } else {
+                    let inbound = session.videoEl.srcObject;
+                    if (!inbound || !(inbound instanceof MediaStream)) {
+                        inbound = new MediaStream();
+                        session.videoEl.srcObject = inbound;
+                    }
+                    inbound.addTrack(event.track);
+                }
+
                 session.loaderEl.style.display = 'none';
                 session.badgeEl.innerText = 'LIVE STREAMING';
                 session.badgeEl.style.color = '#10b981';
@@ -591,18 +649,22 @@
                     session.badgeEl.innerText = 'LIVE STREAMING';
                     session.badgeEl.style.color = '#10b981';
                 } else if (pc.connectionState === "failed" || pc.connectionState === "disconnected") {
-                    session.badgeEl.innerText = 'OFFLINE';
-                    session.badgeEl.style.color = '#ef4444';
+                    session.badgeEl.innerText = 'RECONNECTING';
+                    session.badgeEl.style.color = '#f59e0b';
                 }
             };
 
             // Set remote offer & send answer
             await pc.setRemoteDescription(new RTCSessionDescription(offerSdp));
 
-            // Flush any pending candidates
+            // Flush any pending candidates safely
             while (session.pendingIce.length > 0) {
                 const cand = session.pendingIce.shift();
-                await pc.addIceCandidate(new RTCIceCandidate(cand));
+                try {
+                    await pc.addIceCandidate(new RTCIceCandidate(cand));
+                } catch (e) {
+                    console.warn("Failed to add queued candidate:", e);
+                }
             }
 
             const answer = await pc.createAnswer();
@@ -622,7 +684,9 @@
             const session = targets.get(targetId);
             if (!session) return;
 
-            try { session.pc.close(); } catch (e) {}
+            try {
+                if (session.pc) session.pc.close();
+            } catch (e) {}
             if (session.cardEl && session.cardEl.parentNode) {
                 session.cardEl.remove();
             }

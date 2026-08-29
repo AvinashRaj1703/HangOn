@@ -48,7 +48,7 @@ async def target_endpoint(websocket: WebSocket):
         try:
             await ctrl.send_text(join_notification)
         except Exception:
-            pass
+            controller_sockets.discard(ctrl)
 
     try:
         while True:
@@ -56,6 +56,14 @@ async def target_endpoint(websocket: WebSocket):
             try:
                 msg = json.loads(raw_data)
             except Exception:
+                continue
+
+            # Handle heartbeat ping from target
+            if msg.get("type") == "ping":
+                try:
+                    await websocket.send_text(json.dumps({"type": "pong"}))
+                except Exception:
+                    break
                 continue
 
             msg["targetId"] = target_id
@@ -66,7 +74,7 @@ async def target_endpoint(websocket: WebSocket):
                 try:
                     await ctrl.send_text(payload)
                 except Exception:
-                    pass
+                    controller_sockets.discard(ctrl)
     except WebSocketDisconnect:
         pass
     finally:
@@ -77,7 +85,7 @@ async def target_endpoint(websocket: WebSocket):
             try:
                 await ctrl.send_text(leave_notification)
             except Exception:
-                pass
+                controller_sockets.discard(ctrl)
 
 @app.websocket("/ws/controller")
 async def controller_endpoint(websocket: WebSocket):
@@ -100,6 +108,14 @@ async def controller_endpoint(websocket: WebSocket):
             except Exception:
                 continue
 
+            # Handle heartbeat ping from controller
+            if msg.get("type") == "ping":
+                try:
+                    await websocket.send_text(json.dumps({"type": "pong"}))
+                except Exception:
+                    break
+                continue
+
             target_id = msg.get("targetId")
             # Forward signaling to the specific target
             if target_id and target_id in active_targets:
@@ -107,7 +123,7 @@ async def controller_endpoint(websocket: WebSocket):
                 try:
                     await target_ws.send_text(json.dumps(msg))
                 except Exception:
-                    pass
+                    active_targets.pop(target_id, None)
     except WebSocketDisconnect:
         pass
     finally:
