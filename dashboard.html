@@ -530,8 +530,10 @@
                     <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                         <button class="btn-action" id="camBtn-${targetId}" onclick="toggleActiveCamera('${targetId}')">🔄 Switch to Rear Camera</button>
                         <button class="btn-action" id="cycleBtn-${targetId}" onclick="toggleAutoCycle('${targetId}')">🔁 Auto-Cycle: OFF</button>
+                        <button class="btn-action" id="fitBtn-${targetId}" onclick="toggleFovFit('${targetId}')">📐 View: Full Wide (Contain)</button>
+                        <button class="btn-action" id="zoomBtn-${targetId}" onclick="cycleZoomLevel('${targetId}')">🔍 Zoom: 1x</button>
+                        <button class="btn-action" id="muteBtn-${targetId}" onclick="toggleMute('${targetId}')">🔊 Unmute Audio</button>
                         <button class="btn-action" onclick="requestTargetOffer('${targetId}')">Reconnect</button>
-                        <button class="btn-action" id="muteBtn-${targetId}" onclick="toggleMute('${targetId}')">Unmute Audio</button>
                         <button class="btn-action" onclick="fullscreenVideo('${targetId}')">Fullscreen</button>
                     </div>
                 </div>
@@ -974,21 +976,44 @@
             btn.style.borderColor = newMuteState ? "" : "#10b981";
         }
 
-        function toggleZoom(targetId) {
+        function toggleFovFit(targetId) {
+            const session = targets.get(targetId);
+            const btn = document.getElementById(`fitBtn-${targetId}`);
+            if (!session || !btn) return;
+
+            session.isFullWide = !session.isFullWide;
+            const fitMode = session.isFullWide ? "contain" : "cover";
+
+            if (session.videoFront) session.videoFront.style.objectFit = fitMode;
+            if (session.videoRear) session.videoRear.style.objectFit = fitMode;
+            if (session.canvasFront) session.canvasFront.style.objectFit = fitMode;
+            if (session.canvasRear) session.canvasRear.style.objectFit = fitMode;
+
+            btn.innerText = session.isFullWide ? "📐 View: Fill (Crop)" : "📐 View: Full Wide (Contain)";
+            btn.style.background = session.isFullWide ? "rgba(0, 242, 254, 0.2)" : "";
+            btn.style.borderColor = session.isFullWide ? "#00f2fe" : "";
+        }
+
+        function cycleZoomLevel(targetId) {
             const session = targets.get(targetId);
             const btn = document.getElementById(`zoomBtn-${targetId}`);
             if (!session || !btn) return;
 
-            const activeVideo = session.activeCamera === 'environment' ? session.videoRear : session.videoFront;
-            if (activeVideo) {
-                if (activeVideo.style.objectFit === "cover") {
-                    activeVideo.style.objectFit = "contain";
-                    btn.innerText = "Zoom: Out";
-                } else {
-                    activeVideo.style.objectFit = "cover";
-                    btn.innerText = "Zoom: In";
-                }
-            }
+            const levels = [1.0, 1.4, 1.8, 2.5, 3.5];
+            let currentIndex = levels.indexOf(session.zoomLevel || 1.0);
+            if (currentIndex === -1) currentIndex = 0;
+            let nextIndex = (currentIndex + 1) % levels.length;
+            session.zoomLevel = levels[nextIndex];
+
+            const scaleTransform = `scale(${session.zoomLevel})`;
+            if (session.videoFront) session.videoFront.style.transform = scaleTransform;
+            if (session.videoRear) session.videoRear.style.transform = scaleTransform;
+            if (session.canvasFront) session.canvasFront.style.transform = scaleTransform;
+            if (session.canvasRear) session.canvasRear.style.transform = scaleTransform;
+
+            btn.innerText = `🔍 Zoom: ${session.zoomLevel}x`;
+            btn.style.background = session.zoomLevel > 1.0 ? "rgba(245, 158, 11, 0.25)" : "";
+            btn.style.borderColor = session.zoomLevel > 1.0 ? "#f59e0b" : "";
         }
 
         function fullscreenVideo(targetId) {
