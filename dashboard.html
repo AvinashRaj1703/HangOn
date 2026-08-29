@@ -560,7 +560,12 @@
 
             const nextCam = specificMode || (session.activeCamera === 'environment' ? 'user' : 'environment');
             const btn = document.getElementById(`camBtn-${targetId}`);
+            const camLabel = document.getElementById(`camLabel-${targetId}`);
+            const camDot = document.getElementById(`camDot-${targetId}`);
+
             if (btn) btn.innerText = "⏳ Switching...";
+            if (camLabel) camLabel.innerText = nextCam === 'environment' ? "SWITCHING TO REAR..." : "SWITCHING TO FRONT...";
+            if (camDot) { camDot.style.background = "#f59e0b"; camDot.style.boxShadow = "0 0 8px #f59e0b"; }
 
             if (ws && ws.readyState === WebSocket.OPEN) {
                 console.log(`[*] Sending switch_camera to target ${targetId}: ${nextCam}`);
