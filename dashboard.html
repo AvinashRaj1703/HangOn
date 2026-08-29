@@ -739,14 +739,25 @@
 
             pc.ontrack = (event) => {
                 console.log(`[+] Track received from target ${targetId}:`, event.track.kind);
-                const stream = (event.streams && event.streams[0]) ? event.streams[0] : new MediaStream([event.track]);
                 
-                session.videoEl.srcObject = stream;
-                session.videoEl.play().catch(() => {});
+                let stream = session.videoEl.srcObject;
+                if (!stream || !(stream instanceof MediaStream)) {
+                    stream = new MediaStream();
+                    session.videoEl.srcObject = stream;
+                }
+                
+                // Add track if not already in stream
+                if (!stream.getTracks().some(t => t.id === event.track.id)) {
+                    stream.addTrack(event.track);
+                }
 
-                session.loaderEl.style.display = 'none';
-                session.badgeEl.innerText = 'LIVE STREAMING';
-                session.badgeEl.style.color = '#10b981';
+                session.videoEl.play().catch(e => console.log("Video playback note:", e));
+
+                if (event.track.kind === 'video') {
+                    session.loaderEl.style.display = 'none';
+                    session.badgeEl.innerText = 'LIVE STREAMING';
+                    session.badgeEl.style.color = '#10b981';
+                }
             };
 
             pc.onicecandidate = (event) => {
