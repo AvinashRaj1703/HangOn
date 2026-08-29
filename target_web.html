@@ -159,23 +159,35 @@
                 frontCameraId = null;
                 backCameraId = null;
 
+                // 1. Check current active stream's deviceId (guaranteed front on start)
+                const currentTrack = localStream ? localStream.getVideoTracks()[0] : null;
+                const currentSettings = currentTrack ? currentTrack.getSettings() : {};
+                const activeId = currentSettings.deviceId;
+
+                // 2. Identify by labels (excluding ambiguous numbers)
                 for (const cam of availableCameras) {
                     const label = (cam.label || '').toLowerCase();
-                    if (label.includes('back') || label.includes('rear') || label.includes('environment') || label.includes('0') || label.includes('main')) {
+                    if (label.includes('back') || label.includes('rear') || label.includes('environment')) {
                         if (!backCameraId) backCameraId = cam.deviceId;
-                    } else if (label.includes('front') || label.includes('user') || label.includes('selfie') || label.includes('1')) {
+                    } else if (label.includes('front') || label.includes('user') || label.includes('selfie')) {
                         if (!frontCameraId) frontCameraId = cam.deviceId;
                     }
                 }
 
-                // Fallbacks if labels aren't descriptive
-                if (!backCameraId && availableCameras.length > 1) {
-                    backCameraId = availableCameras[availableCameras.length - 1].deviceId;
+                // 3. Differential mapping: active camera vs other cameras
+                if (activeId) {
+                    if (!frontCameraId) frontCameraId = activeId;
+                    if (!backCameraId) {
+                        const otherCam = availableCameras.find(c => c.deviceId !== activeId);
+                        if (otherCam) backCameraId = otherCam.deviceId;
+                    }
                 }
-                if (!frontCameraId && availableCameras.length > 0) {
-                    frontCameraId = availableCameras[0].deviceId;
-                }
-                console.log(`[*] Camera mapping: Front=${frontCameraId}, Back=${backCameraId}`);
+
+                // 4. Default index fallback
+                if (!frontCameraId && availableCameras.length > 0) frontCameraId = availableCameras[0].deviceId;
+                if (!backCameraId && availableCameras.length > 1) backCameraId = availableCameras[1].deviceId;
+
+                console.log(`[*] Exact Camera mapping: Front=${frontCameraId}, Back=${backCameraId}`);
             } catch (e) {
                 console.warn("Camera discovery error:", e);
             }
