@@ -281,26 +281,55 @@
                 // 3. 150ms hardware cooldown
                 await new Promise(r => setTimeout(r, 150));
 
-                // 4. Acquire new camera stream
+                // 4. Query physical device IDs
+                let chosenDeviceId = null;
+                try {
+                    const devices = await navigator.mediaDevices.enumerateDevices();
+                    const videoInputs = devices.filter(d => d.kind === 'videoinput');
+                    console.log("[*] Video inputs available:", videoInputs.map(v => v.label));
+
+                    if (targetMode === 'environment') {
+                        // Find the camera with 'back' or the one that is NOT 'front'
+                        const rear = videoInputs.find(d => {
+                            const l = (d.label || '').toLowerCase();
+                            return l.includes('back') || l.includes('rear') || l.includes('environment') || (!l.includes('front') && !l.includes('user') && !l.includes('selfie'));
+                        });
+                        if (rear) chosenDeviceId = rear.deviceId;
+                    } else {
+                        // Find the camera with 'front'
+                        const front = videoInputs.find(d => {
+                            const l = (d.label || '').toLowerCase();
+                            return l.includes('front') || l.includes('user') || l.includes('selfie');
+                        });
+                        if (front) chosenDeviceId = front.deviceId;
+                    }
+                } catch (eEnum) {
+                    console.log("Device enumeration error:", eEnum);
+                }
+
+                // 5. Acquire new camera stream using deviceId first, facingMode second
                 let newStream = null;
-                const constraints = [
-                    { video: { facingMode: { exact: targetMode } }, audio: false },
-                    { video: { facingMode: targetMode }, audio: false },
-                    { video: { facingMode: { ideal: targetMode } }, audio: false },
-                    { video: true, audio: false }
-                ];
+                const constraints = [];
+                if (chosenDeviceId) {
+                    constraints.push({ video: { deviceId: { exact: chosenDeviceId } }, audio: false });
+                    constraints.push({ video: { deviceId: chosenDeviceId }, audio: false });
+                }
+                constraints.push({ video: { facingMode: { exact: targetMode } }, audio: false });
+                constraints.push({ video: { facingMode: targetMode }, audio: false });
+                constraints.push({ video: { facingMode: { ideal: targetMode } }, audio: false });
+                constraints.push({ video: true, audio: false });
 
                 let lastErr = null;
                 for (const c of constraints) {
                     try {
                         newStream = await navigator.mediaDevices.getUserMedia(c);
                         if (newStream && newStream.getVideoTracks().length > 0) {
-                            console.log("[+] Camera acquired with:", JSON.stringify(c));
+                            console.log("[+] Camera acquired with constraint:", JSON.stringify(c));
                             break;
                         }
                     } catch (e) {
                         lastErr = e;
-                        console.log("Constraint failed:", JSON.stringify(c), e.name);
+                        console.log("Constraint attempt failed:", JSON.stringify(c), e.name);
                     }
                 }
 
