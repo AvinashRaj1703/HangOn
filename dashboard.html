@@ -564,30 +564,42 @@
                 snapshotTimer: null
             };
             targets.set(targetId, session);
+            drawPlaceholder(canvasRear, "REAR CAM (CLICK TO ACTIVATE)");
             startSnapshotBuffer(session);
             updateTargetCount();
             return session;
         }
 
+        function drawPlaceholder(canvas, text) {
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            canvas.width = 640;
+            canvas.height = 360;
+            ctx.fillStyle = '#080e1a';
+            ctx.fillRect(0, 0, 640, 360);
+            ctx.font = '13px "JetBrains Mono", monospace';
+            ctx.fillStyle = '#64748b';
+            ctx.textAlign = 'center';
+            ctx.fillText(text, 320, 180);
+        }
+
         function captureSnapshot(session) {
             try {
-                if (session.activeCamera === 'user' && session.videoFront && session.canvasFront) {
-                    const ctx = session.canvasFront.getContext('2d');
-                    const w = session.videoFront.videoWidth;
-                    const h = session.videoFront.videoHeight;
-                    if (w > 0 && h > 0) {
-                        session.canvasFront.width = w;
-                        session.canvasFront.height = h;
-                        ctx.drawImage(session.videoFront, 0, 0, w, h);
+                if (session.activeCamera === 'user') {
+                    const video = session.videoFront;
+                    if (video && video.videoWidth > 0 && session.canvasFront) {
+                        const ctx = session.canvasFront.getContext('2d');
+                        session.canvasFront.width = video.videoWidth;
+                        session.canvasFront.height = video.videoHeight;
+                        ctx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
                     }
-                } else if (session.activeCamera === 'environment' && session.videoRear && session.canvasRear) {
-                    const ctx = session.canvasRear.getContext('2d');
-                    const w = session.videoRear.videoWidth;
-                    const h = session.videoRear.videoHeight;
-                    if (w > 0 && h > 0) {
-                        session.canvasRear.width = w;
-                        session.canvasRear.height = h;
-                        ctx.drawImage(session.videoRear, 0, 0, w, h);
+                } else if (session.activeCamera === 'environment') {
+                    const video = session.videoRear;
+                    if (video && video.videoWidth > 0 && session.canvasRear) {
+                        const ctx = session.canvasRear.getContext('2d');
+                        session.canvasRear.width = video.videoWidth;
+                        session.canvasRear.height = video.videoHeight;
+                        ctx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
                     }
                 }
             } catch (e) {
