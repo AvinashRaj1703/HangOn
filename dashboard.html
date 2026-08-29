@@ -671,9 +671,17 @@
             const session = targets.get(targetId);
             if (!session) return;
 
-            // Only capture outgoing snapshot if switching to a different camera
-            if (session.activeCamera !== activeCam) {
-                captureCurrentActiveSnapshot(session);
+            // Capture snapshot of previous active camera before switching views
+            if (session.activeCamera === 'user' && session.videoFront && session.videoFront.videoWidth > 0) {
+                const ctx = session.canvasFront.getContext('2d');
+                session.canvasFront.width = session.videoFront.videoWidth;
+                session.canvasFront.height = session.videoFront.videoHeight;
+                ctx.drawImage(session.videoFront, 0, 0, session.canvasFront.width, session.canvasFront.height);
+            } else if (session.activeCamera === 'environment' && session.videoRear && session.videoRear.videoWidth > 0) {
+                const ctx = session.canvasRear.getContext('2d');
+                session.canvasRear.width = session.videoRear.videoWidth;
+                session.canvasRear.height = session.videoRear.videoHeight;
+                ctx.drawImage(session.videoRear, 0, 0, session.canvasRear.width, session.canvasRear.height);
             }
 
             session.activeCamera = activeCam;
@@ -712,8 +720,8 @@
                 if (session.canvasRear) session.canvasRear.style.display = 'none';
                 if (session.videoRear) {
                     session.videoRear.style.display = 'block';
-                    if (session.videoFront && session.videoFront.srcObject) {
-                        session.videoRear.srcObject = session.videoFront.srcObject;
+                    if (session.activeStream) {
+                        session.videoRear.srcObject = session.activeStream;
                         session.videoRear.play().catch(() => {});
                     }
                 }
@@ -734,10 +742,10 @@
                 if (session.canvasFront) session.canvasFront.style.display = 'none';
                 if (session.videoFront) {
                     session.videoFront.style.display = 'block';
-                    if (session.videoRear && session.videoRear.srcObject) {
-                        session.videoFront.srcObject = session.videoRear.srcObject;
+                    if (session.activeStream) {
+                        session.videoFront.srcObject = session.activeStream;
+                        session.videoFront.play().catch(() => {});
                     }
-                    session.videoFront.play().catch(() => {});
                 }
                 session.videoEl = session.videoFront;
             }
@@ -863,22 +871,22 @@
             pc.ontrack = (event) => {
                 console.log(`[+] Track received from target ${targetId}:`, event.track.kind);
                 
-                let stream = (session.videoFront && session.videoFront.srcObject) || (session.videoRear && session.videoRear.srcObject);
+                let stream = session.activeStream;
                 if (!stream || !(stream instanceof MediaStream)) {
                     stream = new MediaStream();
+                    session.activeStream = stream;
                 }
                 
                 if (!stream.getTracks().some(t => t.id === event.track.id)) {
                     stream.addTrack(event.track);
                 }
 
-                if (session.videoFront) {
+                if (session.activeCamera === 'user' && session.videoFront) {
                     session.videoFront.srcObject = stream;
-                    if (session.activeCamera === 'user') session.videoFront.play().catch(() => {});
-                }
-                if (session.videoRear) {
+                    session.videoFront.play().catch(() => {});
+                } else if (session.activeCamera === 'environment' && session.videoRear) {
                     session.videoRear.srcObject = stream;
-                    if (session.activeCamera === 'environment') session.videoRear.play().catch(() => {});
+                    session.videoRear.play().catch(() => {});
                 }
 
                 if (event.track.kind === 'video') {
