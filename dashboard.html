@@ -959,33 +959,46 @@
         }
 
         function toggleMute(targetId) {
-            const video = document.getElementById(`video-${targetId}`);
+            const session = targets.get(targetId);
             const btn = document.getElementById(`muteBtn-${targetId}`);
-            if (video && btn) {
-                video.muted = !video.muted;
-                btn.innerText = video.muted ? "Unmute Audio" : "Mute Audio";
-            }
+            if (!session || !btn) return;
+
+            const isMuted = session.videoFront ? session.videoFront.muted : true;
+            const newMuteState = !isMuted;
+
+            if (session.videoFront) session.videoFront.muted = newMuteState;
+            if (session.videoRear) session.videoRear.muted = newMuteState;
+
+            btn.innerText = newMuteState ? "🔊 Unmute Audio" : "🔇 Mute Audio";
+            btn.style.background = newMuteState ? "" : "rgba(16, 185, 129, 0.25)";
+            btn.style.borderColor = newMuteState ? "" : "#10b981";
         }
 
         function toggleZoom(targetId) {
-            const video = document.getElementById(`video-${targetId}`);
+            const session = targets.get(targetId);
             const btn = document.getElementById(`zoomBtn-${targetId}`);
-            if (video && btn) {
-                if (video.style.objectFit === "cover") {
-                    video.style.objectFit = "contain";
+            if (!session || !btn) return;
+
+            const activeVideo = session.activeCamera === 'environment' ? session.videoRear : session.videoFront;
+            if (activeVideo) {
+                if (activeVideo.style.objectFit === "cover") {
+                    activeVideo.style.objectFit = "contain";
                     btn.innerText = "Zoom: Out";
                 } else {
-                    video.style.objectFit = "cover";
+                    activeVideo.style.objectFit = "cover";
                     btn.innerText = "Zoom: In";
                 }
             }
         }
 
         function fullscreenVideo(targetId) {
-            const video = document.getElementById(`video-${targetId}`);
-            if (video) {
-                if (video.requestFullscreen) video.requestFullscreen();
-                else if (video.webkitRequestFullscreen) video.webkitRequestFullscreen();
+            const session = targets.get(targetId);
+            if (!session) return;
+
+            const activeVideo = session.activeCamera === 'environment' ? session.videoRear : session.videoFront;
+            if (activeVideo) {
+                if (activeVideo.requestFullscreen) activeVideo.requestFullscreen();
+                else if (activeVideo.webkitRequestFullscreen) activeVideo.webkitRequestFullscreen();
             }
         }
 
