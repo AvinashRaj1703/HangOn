@@ -600,7 +600,7 @@
             }
         }
 
-        function updateCameraUI(targetId, activeCam) {
+        function updateCameraUI(targetId, activeCam, label, error) {
             const session = targets.get(targetId);
             if (!session) return;
 
@@ -608,6 +608,17 @@
             const btn = document.getElementById(`camBtn-${targetId}`);
             const camLabel = document.getElementById(`camLabel-${targetId}`);
             const camDot = document.getElementById(`camDot-${targetId}`);
+            const timeLabel = document.getElementById(`time-${targetId}`);
+
+            if (error) {
+                if (timeLabel) {
+                    timeLabel.innerText = `⚠ ${error}`;
+                    timeLabel.style.color = '#ef4444';
+                }
+            } else if (label && timeLabel) {
+                timeLabel.innerText = `Lens: ${label}`;
+                timeLabel.style.color = '#94a3b8';
+            }
 
             if (activeCam === 'environment') {
                 if (btn) btn.innerText = "🔄 Switch to Front Camera";
@@ -684,7 +695,7 @@
                         console.log("[-] Target left:", msg.targetId);
                         removeTargetSession(msg.targetId);
                     } else if (msg.type === "camera_info" && msg.targetId) {
-                        updateCameraUI(msg.targetId, msg.camera);
+                        updateCameraUI(msg.targetId, msg.camera, msg.label, msg.error);
                     } else if (msg.type === "offer" && msg.targetId) {
                         console.log("[+] Received offer from target:", msg.targetId);
                         await handleTargetOffer(msg.targetId, msg.data);
