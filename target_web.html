@@ -35,20 +35,26 @@
             -webkit-touch-callout: none;
         }
 
-        html, body {
+        html {
+            height: 100%;
+            overflow: hidden;
+            overscroll-behavior: none;
+        }
+
+        body {
+            height: 100%;
+            overflow-y: auto;
+            overflow-x: hidden;
             background: var(--bg-dark);
             color: var(--text-main);
             font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
-            min-height: 100vh;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: space-between;
             padding: 20px 16px env(safe-area-inset-bottom, 20px);
-            overflow-x: hidden;
             overscroll-behavior: none;
-            overscroll-behavior-x: none;
-            overscroll-behavior-y: none;
+            -webkit-overflow-scrolling: touch;
         }
 
         /* Top Header */
