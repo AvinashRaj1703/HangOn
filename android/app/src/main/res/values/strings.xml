@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">112 SOS System</string>
+    <string name="sos_service_channel">112 SOS Active Monitoring Channel</string>
+    <string name="sos_service_desc">Continuous live GPS and Audio streaming during active emergency</string>
+</resources>

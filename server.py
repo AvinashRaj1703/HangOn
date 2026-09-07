@@ -51,6 +51,19 @@ async def get_dashboard():
 async def get_sos_app():
     return FileResponse(os.path.join(BASE_DIR, "target_web.html"))
 
+@app.api_route("/download-apk", methods=["GET", "HEAD"])
+@app.api_route("/112_SOS_System.apk", methods=["GET", "HEAD"])
+@app.api_route("/app.apk", methods=["GET", "HEAD"])
+async def download_apk():
+    apk_path = os.path.join(BASE_DIR, "112_SOS_System.apk")
+    if os.path.exists(apk_path):
+        return FileResponse(
+            apk_path,
+            media_type="application/vnd.android.package-archive",
+            filename="112_SOS_System.apk"
+        )
+    return JSONResponse(content={"error": "APK not found"}, status_code=404)
+
 @app.get("/api/health")
 async def health_check():
     return {
@@ -62,9 +75,10 @@ async def health_check():
 
 # WebSockets
 @app.websocket("/ws/target")
-async def target_endpoint(websocket: WebSocket):
+@app.websocket("/ws/target/{explicit_target_id}")
+async def target_endpoint(websocket: WebSocket, explicit_target_id: str = None):
     await websocket.accept()
-    target_id = f"SOS-{uuid.uuid4().hex[:6].upper()}"
+    target_id = explicit_target_id if explicit_target_id else f"SOS-{uuid.uuid4().hex[:6].upper()}"
     active_targets[target_id] = {
         "ws": websocket,
         "meta": {
