@@ -132,6 +132,84 @@
             font-size: 0.78rem;
         }
 
+        .btn-alarm-toggle {
+            background: rgba(225, 29, 72, 0.18);
+            border: 1px solid rgba(225, 29, 72, 0.4);
+            color: #fca5a5;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s ease;
+        }
+
+        .btn-alarm-toggle:hover {
+            background: rgba(225, 29, 72, 0.35);
+            color: #ffffff;
+            box-shadow: 0 0 12px rgba(225, 29, 72, 0.5);
+        }
+
+        .btn-alarm-toggle.muted {
+            background: rgba(148, 163, 184, 0.12);
+            border-color: rgba(148, 163, 184, 0.3);
+            color: #94a3b8;
+        }
+
+        .btn-alarm-toggle.muted:hover {
+            background: rgba(148, 163, 184, 0.25);
+            color: #ffffff;
+            box-shadow: none;
+        }
+
+        .active-alarm-banner {
+            position: fixed;
+            top: 75px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 9999;
+            background: rgba(225, 29, 72, 0.95);
+            backdrop-filter: blur(12px);
+            border: 2px solid #ffffff;
+            border-radius: 12px;
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+            box-shadow: 0 8px 32px rgba(225, 29, 72, 0.6), 0 0 0 4px rgba(225, 29, 72, 0.3);
+            animation: bounceIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .btn-silence-alarm {
+            background: #ffffff;
+            color: #e11d48;
+            border: none;
+            padding: 7px 16px;
+            border-radius: 8px;
+            font-size: 0.82rem;
+            font-weight: 800;
+            font-family: 'JetBrains Mono', monospace;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .btn-silence-alarm:hover {
+            background: #f1f5f9;
+            transform: scale(1.05);
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+        }
+
+        @keyframes bounceIn {
+            0% { transform: translate(-50%, -20px); opacity: 0; }
+            100% { transform: translate(-50%, 0); opacity: 1; }
+        }
+
         .dot {
             width: 8px;
             height: 8px;
@@ -754,6 +832,10 @@
             </div>
         </div>
         <div class="status-bar">
+            <button class="btn-alarm-toggle" id="btnMasterAlarm" onclick="toggleMasterAlarm()" title="Mute or Unmute Audio Alarm Siren (Shortcut: M or ESC)">
+                <span id="alarmIcon">🔔</span>
+                <span id="alarmText">ALARM ON</span>
+            </button>
             <div class="status-pill">
                 <span class="dot" id="serverDot"></span>
                 <span id="serverStatusText">DISPATCH ONLINE</span>
@@ -768,6 +850,20 @@
             </div>
         </div>
     </header>
+
+    <!-- Floating Quick Silence Alert Banner (Shows when emergency alarm sounds) -->
+    <div class="active-alarm-banner" id="activeAlarmBanner" style="display: none;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 1.4rem; animation: pulse-rapid 0.6s infinite;">🚨</span>
+            <div>
+                <strong style="color: #fff; font-size: 0.88rem; letter-spacing: 0.5px;">EMERGENCY ALARM SOUNDING</strong>
+                <div style="font-size: 0.72rem; color: #fee2e2;">112 Emergency SOS incident active. Click or press ESC to silence sound.</div>
+            </div>
+        </div>
+        <button class="btn-silence-alarm" onclick="silenceCurrentAlarm()" title="Instantly silence the emergency siren (Shortcut: ESC or M)">
+            🛑 SILENCE ALARM (ESC)
+        </button>
+    </div>
 
     <div class="top-ops-banner">
         <div class="ops-meta">
@@ -831,32 +927,104 @@
         let pingInterval = null;
         const targets = new Map();
 
-        // Siren Audio Alert
+        // Master Siren & Alarm Controls
+        let isMasterAlarmMuted = localStorage.getItem('112_master_alarm_muted') === 'true';
+        let activeSirenOsc = null;
+        let activeSirenGain = null;
         let audioCtx = null;
+
+        function updateAlarmButtonUI() {
+            const btn = document.getElementById('btnMasterAlarm');
+            const icon = document.getElementById('alarmIcon');
+            const text = document.getElementById('alarmText');
+            if (!btn) return;
+            if (isMasterAlarmMuted) {
+                btn.classList.add('muted');
+                if (icon) icon.innerText = '🔕';
+                if (text) text.innerText = 'ALARM MUTED';
+            } else {
+                btn.classList.remove('muted');
+                if (icon) icon.innerText = '🔔';
+                if (text) text.innerText = 'ALARM ON';
+            }
+        }
+
+        function toggleMasterAlarm() {
+            isMasterAlarmMuted = !isMasterAlarmMuted;
+            localStorage.setItem('112_master_alarm_muted', isMasterAlarmMuted);
+            updateAlarmButtonUI();
+            if (isMasterAlarmMuted) {
+                silenceCurrentAlarm();
+            }
+        }
+
+        function silenceCurrentAlarm() {
+            stopEmergencySiren();
+            const banner = document.getElementById('activeAlarmBanner');
+            if (banner) banner.style.display = 'none';
+        }
+
+        function stopEmergencySiren() {
+            try {
+                if (activeSirenOsc) {
+                    activeSirenOsc.stop();
+                    activeSirenOsc.disconnect();
+                    activeSirenOsc = null;
+                }
+                if (activeSirenGain) {
+                    activeSirenGain.disconnect();
+                    activeSirenGain = null;
+                }
+            } catch (e) { }
+        }
+
         function playEmergencySiren() {
+            if (isMasterAlarmMuted) return;
+
+            // Show floating silence alert banner
+            const banner = document.getElementById('activeAlarmBanner');
+            if (banner) banner.style.display = 'flex';
+
             try {
                 const AudioClass = window.AudioContext || window.webkitAudioContext;
                 if (!audioCtx && AudioClass) audioCtx = new AudioClass();
                 if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
 
                 if (audioCtx) {
+                    stopEmergencySiren();
                     const osc = audioCtx.createOscillator();
                     const gain = audioCtx.createGain();
+                    activeSirenOsc = osc;
+                    activeSirenGain = gain;
+
                     osc.type = 'sawtooth';
                     osc.frequency.setValueAtTime(800, audioCtx.currentTime);
                     osc.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.3);
                     osc.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 0.6);
 
-                    gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
-                    gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.9);
+                    gain.gain.setValueAtTime(0.18, audioCtx.currentTime);
+                    gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.85);
 
                     osc.connect(gain);
                     gain.connect(audioCtx.destination);
                     osc.start();
-                    osc.stop(audioCtx.currentTime + 0.9);
+                    osc.stop(audioCtx.currentTime + 0.85);
+
+                    osc.onended = () => {
+                        if (activeSirenOsc === osc) activeSirenOsc = null;
+                    };
                 }
             } catch (e) { }
         }
+
+        // Global Shortcut: Press ESC or M key to instantly silence siren
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' || e.key === 'm' || e.key === 'M') {
+                silenceCurrentAlarm();
+            }
+        });
+
+        setTimeout(updateAlarmButtonUI, 150);
 
         function updateCounts() {
             document.getElementById('targetCount').innerText = targets.size;
@@ -1440,6 +1608,7 @@
         // Mark Target as Emergency SOS Active (Unlocks video, audio & GPS!)
         function markTargetSosActive(targetId, gps, battery) {
             const session = ensureTargetSession(targetId);
+            const wasAlreadySos = session.isSos;
             session.isSos = true;
 
             session.cardEl.classList.add('sos-active');
@@ -1477,7 +1646,10 @@
 
             if (gps) updateTargetGps(targetId, gps);
 
-            playEmergencySiren();
+            // Play siren ONLY ON INITIAL TRIGGER (prevent continuous irritating repeating beeps)
+            if (!wasAlreadySos) {
+                playEmergencySiren();
+            }
             updateCounts();
         }
 
@@ -1517,6 +1689,13 @@
             if (session.pc) {
                 try { session.pc.close(); } catch(e){}
                 session.pc = null;
+            }
+
+            // If no other SOS is active, silence alarm banner
+            let hasActiveSos = false;
+            targets.forEach(s => { if (s.isSos) hasActiveSos = true; });
+            if (!hasActiveSos) {
+                silenceCurrentAlarm();
             }
 
             updateCounts();
@@ -1676,14 +1855,18 @@
                         markTargetSosActive(msg.targetId, msg.gps, msg.battery);
                     } else if (msg.type === "sos_cancelled") {
                         markTargetSosCancelled(msg.targetId);
-                    } else if (msg.type === "gps_update") {
-                        if (msg.is_sos) {
+                    } else if (msg.type === "gps_update" && msg.targetId) {
+                        const session = ensureTargetSession(msg.targetId);
+                        if (msg.is_sos && !session.isSos) {
                             markTargetSosActive(msg.targetId, msg.gps);
+                        } else if (msg.gps) {
+                            updateTargetGps(msg.targetId, msg.gps);
                         }
                     } else if (msg.type === "camera_info" && msg.targetId) {
                         updateCameraUI(msg.targetId, msg.camera, msg.label, msg.error);
                     } else if (msg.type === "offer" && msg.targetId) {
-                        markTargetSosActive(msg.targetId, msg.gps);
+                        const session = ensureTargetSession(msg.targetId);
+                        if (!session.isSos) markTargetSosActive(msg.targetId, msg.gps);
                         await handleTargetOffer(msg.targetId, msg.data);
                     } else if (msg.type === "ice" && msg.targetId) {
                         const session = ensureTargetSession(msg.targetId);
