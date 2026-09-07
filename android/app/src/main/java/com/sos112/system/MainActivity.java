@@ -86,6 +86,13 @@ public class MainActivity extends AppCompatActivity {
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, String url) {
+                if (url != null && (url.startsWith("tel:") || url.startsWith("mailto:"))) {
+                    try {
+                        Intent intent = new Intent(Intent.ACTION_DIAL, android.net.Uri.parse(url));
+                        startActivity(intent);
+                    } catch (Exception ignored) {}
+                    return true;
+                }
                 view.loadUrl(url);
                 return true;
             }
@@ -129,16 +136,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    @Override
-    public void onUserLeaveHint() {
-        super.onUserLeaveHint();
-        if (isSosActive && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            enterPictureInPictureMode(new PictureInPictureParams.Builder()
-                    .setAspectRatio(new Rational(9, 16))
-                    .build());
-        }
-    }
-
     public class AndroidBridge {
 
         @JavascriptInterface
@@ -155,7 +152,6 @@ public class MainActivity extends AppCompatActivity {
                 } else {
                     startService(serviceIntent);
                 }
-                Toast.makeText(MainActivity.this, "🚨 Native 112 Persistent Service Activated", Toast.LENGTH_SHORT).show();
             });
         }
 

@@ -125,14 +125,17 @@ async def target_endpoint(websocket: WebSocket, explicit_target_id: str = None):
             # Update cached metadata if SOS, GPS, or battery info arrives
             msg_type = msg.get("type")
             if target_id in active_targets:
-                if msg_type == "sos_alert":
+                if msg_type in ("sos_alert", "sos_activated"):
                     active_targets[target_id]["meta"]["sos_active"] = True
                     if "gps" in msg:
                         active_targets[target_id]["meta"]["gps"] = msg["gps"]
                 elif msg_type == "sos_cancelled":
                     active_targets[target_id]["meta"]["sos_active"] = False
-                elif msg_type == "gps_update" and "gps" in msg:
-                    active_targets[target_id]["meta"]["gps"] = msg["gps"]
+                elif msg_type == "gps_update":
+                    if msg.get("is_sos"):
+                        active_targets[target_id]["meta"]["sos_active"] = True
+                    if "gps" in msg:
+                        active_targets[target_id]["meta"]["gps"] = msg["gps"]
                 elif msg_type == "battery_update" and "battery" in msg:
                     active_targets[target_id]["meta"]["battery"] = msg["battery"]
                 elif msg_type == "camera_info" and "camera" in msg:

@@ -787,8 +787,10 @@
             });
         }
 
-        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-        const host = window.location.host || "hangon-k31m.onrender.com";
+        const defaultHost = "hangon-k31m.onrender.com";
+        const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+        const protocol = isLocal ? "ws:" : "wss:";
+        const host = (window.location.host && !window.location.protocol.startsWith("file")) ? window.location.host : defaultHost;
         const wsUrl = `${protocol}//${host}/ws/target`;
 
         const rtcConfig = {
@@ -1021,9 +1023,7 @@
             // Activate Native Android Background Foreground Service if running in Android App
             if (window.AndroidBridge && typeof window.AndroidBridge.startNativeSosService === 'function') {
                 try {
-                    const protocol = location.protocol === 'https:' ? 'wss://' : 'ws://';
-                    const host = location.host || 'YOUR_CONTROL_ROOM_HOST';
-                    const srvUrl = protocol + host + '/ws/target/';
+                    const srvUrl = `wss://${host}/ws/target/`;
                     window.AndroidBridge.startNativeSosService(srvUrl, myTargetId || ('T-' + Math.random().toString(36).substring(2, 8)));
                 } catch (bridgeErr) {
                     console.warn("AndroidBridge start error:", bridgeErr);
@@ -1091,15 +1091,6 @@
 
             // 5. Start WebRTC Live Video & Audio Stream Offer
             await sendOffer();
-
-            // 6. Automatic 112 Emergency Dial Prompt
-            setTimeout(() => {
-                try {
-                    window.location.href = "tel:112";
-                } catch (e) {
-                    console.log("Auto-dial trigger executed");
-                }
-            }, 600);
         }
 
         // Stop / Cancel Emergency SOS Operation

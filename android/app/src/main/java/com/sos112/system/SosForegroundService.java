@@ -55,7 +55,7 @@ public class SosForegroundService extends Service implements LocationListener {
     private LocationManager locationManager;
     private OkHttpClient httpClient;
     private WebSocket webSocket;
-    private String serverWsUrl = "ws://10.0.2.2:8000/ws/target/";
+    private String serverWsUrl = "wss://hangon-k31m.onrender.com/ws/target/";
     private String targetId = "T-APP-" + System.currentTimeMillis();
 
     private boolean isSosActive = false;
@@ -131,7 +131,13 @@ public class SosForegroundService extends Service implements LocationListener {
             }
 
             if (intent.hasExtra(EXTRA_SERVER_URL)) {
-                serverWsUrl = intent.getStringExtra(EXTRA_SERVER_URL);
+                String extraUrl = intent.getStringExtra(EXTRA_SERVER_URL);
+                if (extraUrl != null && !extraUrl.isEmpty()) {
+                    if (extraUrl.startsWith("ws://") && extraUrl.contains("render.com")) {
+                        extraUrl = extraUrl.replace("ws://", "wss://");
+                    }
+                    serverWsUrl = extraUrl;
+                }
             }
             if (intent.hasExtra(EXTRA_TARGET_ID)) {
                 targetId = intent.getStringExtra(EXTRA_TARGET_ID);
@@ -183,6 +189,9 @@ public class SosForegroundService extends Service implements LocationListener {
             }
 
             String fullUrl = serverWsUrl;
+            if (fullUrl.startsWith("ws://") && fullUrl.contains("render.com")) {
+                fullUrl = fullUrl.replace("ws://", "wss://");
+            }
             if (!fullUrl.endsWith("/")) fullUrl += "/";
             fullUrl += targetId;
 
@@ -191,11 +200,12 @@ public class SosForegroundService extends Service implements LocationListener {
                 @Override
                 public void onOpen(WebSocket ws, Response response) {
                     Log.d(TAG, "Native SOS WebSocket Connected to " + serverWsUrl);
-                    // Send initial handshake / SOS active signal
+                    // Send initial handshake / SOS alert signal recognized by server
                     try {
                         JSONObject sosMsg = new JSONObject();
-                        sosMsg.put("type", "sos_activated");
-                        sosMsg.put("target_id", targetId);
+                        sosMsg.put("type", "sos_alert");
+                        sosMsg.put("is_sos", true);
+                        sosMsg.put("targetId", targetId);
                         sosMsg.put("mode", "native_background_persistence");
                         ws.send(sosMsg.toString());
                     } catch (Exception e) {
