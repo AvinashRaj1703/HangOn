@@ -586,6 +586,14 @@
         </div>
     </header>
 
+    <!-- One-Tap PWA Install Bar -->
+    <div id="pwaInstallBanner" style="display: none; width: 100%; max-width: 440px; margin-bottom: 12px; background: rgba(0, 242, 254, 0.12); border: 1px solid rgba(0, 242, 254, 0.35); border-radius: 12px; padding: 10px 14px; align-items: center; justify-content: space-between; gap: 10px;">
+        <div style="font-size: 0.8rem; color: #e0f2fe; text-align: left;">
+            📲 <b>Install App:</b> Add 112 SOS to Home Screen for 1-tap rapid launch
+        </div>
+        <button onclick="installPwaApp()" style="background: #00f2fe; color: #060910; border: none; padding: 6px 14px; border-radius: 6px; font-size: 0.78rem; font-weight: 800; cursor: pointer; white-space: nowrap;">Install</button>
+    </div>
+
     <div class="app-container">
         <!-- Step 1: Upfront Transparent Pre-Arming Permission View -->
         <div class="permission-card" id="permissionCard">
@@ -729,7 +737,36 @@
     </footer>
 
     <script>
-        // PWA Service Worker Registration
+        // PWA Service Worker Registration & Install Prompt
+        let deferredPrompt = null;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            const banner = document.getElementById('pwaInstallBanner');
+            if (banner) banner.style.display = 'flex';
+        });
+
+        // Show banner on mobile Safari/iOS if not installed in standalone mode
+        if (window.navigator.standalone === false || (!window.matchMedia('(display-mode: standalone)').matches && /iPhone|iPad|iPod/.test(navigator.userAgent))) {
+            const banner = document.getElementById('pwaInstallBanner');
+            if (banner) banner.style.display = 'flex';
+        }
+
+        function installPwaApp() {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then((choiceResult) => {
+                    if (choiceResult.outcome === 'accepted') {
+                        const banner = document.getElementById('pwaInstallBanner');
+                        if (banner) banner.style.display = 'none';
+                    }
+                    deferredPrompt = null;
+                });
+            } else {
+                alert("📲 To Install on iPhone / iPad:\n1. Tap the Share icon (square with arrow ↑) in Safari.\n2. Scroll down and tap 'Add to Home Screen'.");
+            }
+        }
+
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('/sw.js').then((reg) => {
