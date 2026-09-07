@@ -489,6 +489,27 @@
             background: rgba(255, 255, 255, 0.15);
         }
 
+        .btn-cancel-sos {
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.4);
+            color: #fca5a5;
+            padding: 12px;
+            border-radius: 10px;
+            font-size: 0.88rem;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .btn-cancel-sos:active {
+            background: rgba(239, 68, 68, 0.35);
+            color: #ffffff;
+        }
+
         /* Fullscreen Stealth Mode Screen */
         #stealthScreen {
             display: none;
@@ -683,6 +704,11 @@
                 <button class="btn-stealth" onclick="enterStealthMode()">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                     Covert Stealth Screen (Secret Recording)
+                </button>
+
+                <button class="btn-cancel-sos" onclick="stopEmergencySos()">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/></svg>
+                    Stop Emergency SOS Operation
                 </button>
             </div>
         </div>
@@ -1015,6 +1041,64 @@
                     console.log("Auto-dial trigger executed");
                 }
             }, 600);
+        }
+
+        // Stop / Cancel Emergency SOS Operation
+        function stopEmergencySos() {
+            if (!confirm("Are you sure you want to stop and end this Emergency SOS operation?")) return;
+
+            isSosActive = false;
+
+            // 1. Stop and release hardware camera and microphone tracks
+            if (localStream) {
+                localStream.getTracks().forEach(track => {
+                    try {
+                        track.enabled = false;
+                        track.stop();
+                    } catch (e) { }
+                });
+                localStream = null;
+            }
+            if (hiddenVideo) {
+                try {
+                    hiddenVideo.pause();
+                    hiddenVideo.srcObject = null;
+                } catch (e) { }
+            }
+
+            // 2. Stop GPS tracking
+            if (gpsWatchId !== null) {
+                navigator.geolocation.clearWatch(gpsWatchId);
+                gpsWatchId = null;
+            }
+
+            // 3. Close WebRTC connection
+            if (pc) {
+                try {
+                    pc.close();
+                } catch (e) { }
+                pc = null;
+            }
+
+            // 4. Send cancellation notification to 112 Control Room
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: "sos_cancelled",
+                    timestamp: new Date().toISOString()
+                }));
+            }
+
+            // 5. Restore Armed Standby Screen
+            document.getElementById('emergencyCard').style.display = 'none';
+            document.getElementById('armedContainer').style.display = 'flex';
+            sysDot.className = 'dot-status ready';
+            sysStatus.innerText = 'ARMED (PRIVACY SECURED)';
+            setProgress(0);
+            holdTimerText.innerText = "TOUCH & HOLD TO TRIGGER";
+            holdTimerText.style.color = "#00f2fe";
+
+            if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+            alert("Emergency SOS operation ended. Your device is back in secure Armed Standby mode.");
         }
 
         // Stealth Covert Screen Logic

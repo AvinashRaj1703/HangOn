@@ -115,6 +115,8 @@ async def target_endpoint(websocket: WebSocket):
                     active_targets[target_id]["meta"]["sos_active"] = True
                     if "gps" in msg:
                         active_targets[target_id]["meta"]["gps"] = msg["gps"]
+                elif msg_type == "sos_cancelled":
+                    active_targets[target_id]["meta"]["sos_active"] = False
                 elif msg_type == "gps_update" and "gps" in msg:
                     active_targets[target_id]["meta"]["gps"] = msg["gps"]
                 elif msg_type == "battery_update" and "battery" in msg:

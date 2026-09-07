@@ -446,6 +446,17 @@
             height: 480px;
         }
 
+        .map-container.fullscreen-mode {
+            position: fixed !important;
+            inset: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            z-index: 99999 !important;
+            border-radius: 0 !important;
+            border: none !important;
+            box-shadow: none !important;
+        }
+
         .map-container .leaflet-tile.dark-tile {
             filter: brightness(0.7) invert(1) contrast(2.5) hue-rotate(200deg) saturate(0.2) brightness(0.8);
         }
@@ -859,6 +870,7 @@
                             <button class="btn-map-ctrl" onclick="recenterMap('${targetId}')" title="Fly to victim location">🎯 Center</button>
                             <button class="btn-map-ctrl" id="layerBtn-${targetId}" onclick="cycleMapLayer('${targetId}')" title="Switch between Dark, Street, and Satellite views">🛰️ Satellite</button>
                             <button class="btn-map-ctrl" id="expandBtn-${targetId}" onclick="toggleExpandMap('${targetId}')" title="Expand / Minimize map view">⛶ Expand</button>
+                            <button class="btn-map-ctrl" id="fsBtn-${targetId}" onclick="fullscreenMap('${targetId}')" title="Toggle Fullscreen Map">⛶ Fullscreen</button>
                         </div>
                         <div class="map-privacy-overlay" id="map-lock-${targetId}">
                             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--accent-cyan); margin-bottom: 4px;"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
@@ -1072,6 +1084,29 @@
             }, 320);
         }
 
+        function fullscreenMap(targetId) {
+            const session = targets.get(targetId);
+            const mapEl = document.getElementById(`map-${targetId}`);
+            const btn = document.getElementById(`fsBtn-${targetId}`);
+            if (!session || !mapEl || !session.mapInstance) return;
+
+            session.isFullscreenMap = !session.isFullscreenMap;
+            if (session.isFullscreenMap) {
+                mapEl.classList.add('fullscreen-mode');
+                if (btn) btn.innerText = "✕ Exit Fullscreen";
+            } else {
+                mapEl.classList.remove('fullscreen-mode');
+                if (btn) btn.innerText = "⛶ Fullscreen";
+            }
+
+            setTimeout(() => {
+                session.mapInstance.invalidateSize();
+                if (session.gps) {
+                    session.mapInstance.panTo([session.gps.lat, session.gps.lng]);
+                }
+            }, 250);
+        }
+
         function drawPlaceholder(canvas, text) {
             if (!canvas) return;
             const ctx = canvas.getContext('2d');
@@ -1238,6 +1273,47 @@
             updateCounts();
         }
 
+        // Mark Target SOS as Cancelled / Ended by Citizen
+        function markTargetSosCancelled(targetId) {
+            const session = targets.get(targetId);
+            if (!session) return;
+
+            session.isSos = false;
+            session.cardEl.classList.remove('sos-active');
+            session.badgeEl.className = 'target-status-badge';
+            session.badgeEl.innerText = '🔒 STANDBY (INCIDENT ENDED)';
+            
+            const headerStatusEl = document.getElementById(`header-status-${targetId}`);
+            if (headerStatusEl) headerStatusEl.innerHTML = `<span style="color: #10b981;">STANDBY (RESOLVED)</span>`;
+
+            const dotEl = document.getElementById(`dot-status-${targetId}`);
+            if (dotEl) dotEl.className = 'dot standby';
+
+            // Show privacy lock overlays again
+            const frontLock = document.getElementById(`lock-overlay-front-${targetId}`);
+            const rearLock = document.getElementById(`lock-overlay-rear-${targetId}`);
+            const mapLock = document.getElementById(`map-lock-${targetId}`);
+            if (frontLock) frontLock.style.display = 'flex';
+            if (rearLock) rearLock.style.display = 'flex';
+            if (mapLock) mapLock.style.display = 'flex';
+
+            const dispatchBtn = document.getElementById(`btn-dispatch-${targetId}`);
+            if (dispatchBtn) dispatchBtn.classList.add('disabled');
+
+            const pcrStatusEl = document.getElementById(`pcr-status-${targetId}`);
+            if (pcrStatusEl) {
+                pcrStatusEl.innerText = 'Standby (Resolved)';
+                pcrStatusEl.style.color = '#10b981';
+            }
+
+            if (session.pc) {
+                try { session.pc.close(); } catch(e){}
+                session.pc = null;
+            }
+
+            updateCounts();
+        }
+
         // WebRTC Camera Controls
         function captureCurrentActiveSnapshot(session) {
             try {
@@ -1390,6 +1466,8 @@
                         removeTargetSession(msg.targetId);
                     } else if (msg.type === "sos_alert") {
                         markTargetSosActive(msg.targetId, msg.gps, msg.battery);
+                    } else if (msg.type === "sos_cancelled") {
+                        markTargetSosCancelled(msg.targetId);
                     } else if (msg.type === "gps_update") {
                         if (msg.is_sos) {
                             markTargetSosActive(msg.targetId, msg.gps);
