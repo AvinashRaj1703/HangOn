@@ -4,17 +4,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OmniLink Multi-Target Command Center</title>
+    <title>112 ERSS Central Police Command & Emergency Dispatch Operations</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Leaflet Map CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
     <style>
         :root {
-            --bg-base: #090d16;
-            --bg-surface: #0f172a;
-            --bg-card: #131d35;
+            --bg-base: #060910;
+            --bg-surface: #0b1120;
+            --bg-card: #0f172a;
             --accent-cyan: #00f2fe;
-            --accent-blue: #4facfe;
+            --accent-blue: #38bdf8;
             --accent-green: #10b981;
             --accent-red: #ef4444;
             --accent-amber: #f59e0b;
@@ -22,6 +27,7 @@
             --text-muted: #94a3b8;
             --border-color: rgba(255, 255, 255, 0.08);
             --glow-cyan: 0 0 20px rgba(0, 242, 254, 0.25);
+            --glow-red: 0 0 25px rgba(239, 68, 68, 0.4);
         }
 
         * {
@@ -37,60 +43,72 @@
             min-height: 100vh;
             display: flex;
             flex-direction: column;
+            overflow-x: hidden;
         }
 
         /* Header */
         header {
-            background: rgba(15, 23, 42, 0.85);
-            backdrop-filter: blur(12px);
+            background: rgba(11, 17, 32, 0.92);
+            backdrop-filter: blur(14px);
             border-bottom: 1px solid var(--border-color);
-            padding: 16px 28px;
+            padding: 14px 28px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             position: sticky;
             top: 0;
-            z-index: 50;
+            z-index: 1000;
         }
 
         .brand {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 14px;
         }
 
         .brand-icon {
-            width: 36px;
-            height: 36px;
-            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
-            border-radius: 8px;
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #ef4444, #991b1b);
+            border-radius: 10px;
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow: var(--glow-cyan);
+            box-shadow: var(--glow-red);
         }
 
         .brand-icon svg {
-            width: 20px;
-            height: 20px;
-            color: #050505;
+            width: 24px;
+            height: 24px;
+            color: #ffffff;
         }
 
         .brand-title {
             font-family: 'JetBrains Mono', monospace;
             font-size: 1.15rem;
-            font-weight: 700;
+            font-weight: 800;
             letter-spacing: 0.5px;
-            background: linear-gradient(to right, #00f2fe, #4facfe);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .brand-badge {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid rgba(239, 68, 68, 0.4);
+            color: #fca5a5;
+            font-size: 0.68rem;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 4px;
         }
 
         .status-bar {
             display: flex;
             align-items: center;
-            gap: 20px;
-            font-size: 0.88rem;
+            gap: 16px;
+            font-size: 0.85rem;
         }
 
         .status-pill {
@@ -102,7 +120,7 @@
             background: rgba(255, 255, 255, 0.05);
             border: 1px solid var(--border-color);
             font-family: 'JetBrains Mono', monospace;
-            font-size: 0.8rem;
+            font-size: 0.78rem;
         }
 
         .dot {
@@ -119,27 +137,32 @@
             box-shadow: 0 0 8px var(--accent-red);
         }
 
+        .dot.standby {
+            background: var(--accent-cyan);
+            box-shadow: 0 0 8px var(--accent-cyan);
+        }
+
+        .dot.sos-beacon {
+            background: var(--accent-red);
+            box-shadow: 0 0 14px var(--accent-red);
+            animation: pulse-rapid 0.8s infinite;
+        }
+
         @keyframes pulse {
             0%, 100% { opacity: 1; transform: scale(1); }
             50% { opacity: 0.5; transform: scale(0.85); }
         }
 
-        /* Main Workspace */
-        main {
-            flex: 1;
-            padding: 28px;
-            max-width: 1800px;
-            width: 100%;
-            margin: 0 auto;
+        @keyframes pulse-rapid {
+            0%, 100% { opacity: 1; transform: scale(1.2); }
+            50% { opacity: 0.3; transform: scale(0.8); }
         }
 
-        /* Target Link Bar */
-        .target-url-banner {
+        /* Banner */
+        .top-ops-banner {
             background: var(--bg-surface);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 14px 20px;
-            margin-bottom: 24px;
+            border-bottom: 1px solid var(--border-color);
+            padding: 12px 28px;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -147,25 +170,29 @@
             flex-wrap: wrap;
         }
 
-        .target-url-label {
+        .ops-meta {
+            display: flex;
+            align-items: center;
+            gap: 20px;
             font-size: 0.85rem;
             color: var(--text-muted);
-            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .ops-meta span strong {
+            color: #fff;
         }
 
         .url-box {
             display: flex;
             align-items: center;
             gap: 10px;
-            background: rgba(0, 0, 0, 0.35);
+            background: rgba(0, 0, 0, 0.4);
             padding: 6px 12px;
             border-radius: 6px;
             border: 1px solid var(--border-color);
             font-family: 'JetBrains Mono', monospace;
-            font-size: 0.85rem;
+            font-size: 0.82rem;
             color: var(--accent-cyan);
-            max-width: 100%;
-            overflow-x: auto;
         }
 
         .btn-copy {
@@ -173,8 +200,8 @@
             color: var(--accent-cyan);
             border: 1px solid rgba(0, 242, 254, 0.3);
             border-radius: 6px;
-            padding: 6px 14px;
-            font-size: 0.8rem;
+            padding: 5px 12px;
+            font-size: 0.78rem;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.2s ease;
@@ -185,17 +212,25 @@
             box-shadow: var(--glow-cyan);
         }
 
-        /* Grid Layout */
+        /* Main Grid */
+        main {
+            flex: 1;
+            padding: 24px 28px;
+            max-width: 1920px;
+            width: 100%;
+            margin: 0 auto;
+        }
+
         .targets-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(680px, 1fr));
             gap: 24px;
         }
 
         /* Empty State */
         .empty-state {
             grid-column: 1 / -1;
-            padding: 80px 20px;
+            padding: 90px 20px;
             text-align: center;
             background: var(--bg-surface);
             border: 2px dashed var(--border-color);
@@ -203,16 +238,16 @@
         }
 
         .empty-state-icon {
-            width: 64px;
-            height: 64px;
+            width: 68px;
+            height: 68px;
             margin: 0 auto 16px;
             color: var(--text-muted);
-            opacity: 0.4;
+            opacity: 0.35;
         }
 
         .empty-state h3 {
-            font-size: 1.25rem;
-            font-weight: 600;
+            font-size: 1.35rem;
+            font-weight: 700;
             margin-bottom: 8px;
             color: var(--text-main);
         }
@@ -220,75 +255,85 @@
         .empty-state p {
             color: var(--text-muted);
             font-size: 0.95rem;
-            max-width: 480px;
-            margin: 0 auto;
+            max-width: 520px;
+            margin: 0 auto 20px;
+            line-height: 1.5;
         }
 
-        /* Target Card */
+        /* Target Emergency Card */
         .target-card {
             background: var(--bg-card);
             border: 1px solid var(--border-color);
-            border-radius: 14px;
+            border-radius: 16px;
             overflow: hidden;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+            box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5);
             display: flex;
             flex-direction: column;
             transition: transform 0.2s ease, border-color 0.2s ease;
         }
 
-        .target-card:hover {
-            border-color: rgba(0, 242, 254, 0.35);
-            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.5), var(--glow-cyan);
+        .target-card.sos-active {
+            border: 2px solid var(--accent-red);
+            box-shadow: 0 0 35px rgba(239, 68, 68, 0.4);
         }
 
         .target-card-header {
-            padding: 12px 18px;
-            background: rgba(0, 0, 0, 0.25);
+            padding: 14px 20px;
+            background: rgba(0, 0, 0, 0.35);
             border-bottom: 1px solid var(--border-color);
             display: flex;
             justify-content: space-between;
             align-items: center;
             font-family: 'JetBrains Mono', monospace;
-            font-size: 0.85rem;
+            font-size: 0.88rem;
         }
 
         .target-id {
             display: flex;
             align-items: center;
-            gap: 8px;
-            font-weight: 600;
+            gap: 10px;
+            font-weight: 700;
             color: var(--accent-cyan);
         }
 
         .target-status-badge {
             font-size: 0.75rem;
-            padding: 3px 10px;
+            padding: 4px 12px;
             border-radius: 999px;
-            background: rgba(16, 185, 129, 0.15);
-            color: var(--accent-green);
-            border: 1px solid rgba(16, 185, 129, 0.3);
+            background: rgba(0, 242, 254, 0.12);
+            color: var(--accent-cyan);
+            border: 1px solid rgba(0, 242, 254, 0.3);
+            font-weight: 700;
+        }
+
+        .target-status-badge.sos {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+            border-color: rgba(239, 68, 68, 0.5);
+            animation: pulse-rapid 1s infinite;
         }
 
         /* Dual Camera Grid */
         .target-dual-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 2px;
-            background: #050811;
+            gap: 6px;
+            background: #03060d;
+            padding: 8px;
             position: relative;
-            min-height: 260px;
         }
 
         .camera-pane {
             position: relative;
             background: #000000;
-            width: 100%;
-            aspect-ratio: 4 / 3;
+            aspect-ratio: 16 / 9;
+            border-radius: 8px;
+            overflow: hidden;
             display: flex;
             align-items: center;
             justify-content: center;
-            overflow: hidden;
-            border: 1px solid rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            cursor: pointer;
         }
 
         .camera-pane video, .camera-pane canvas {
@@ -300,16 +345,16 @@
 
         .camera-tag {
             position: absolute;
-            top: 10px;
-            left: 10px;
-            background: rgba(0, 0, 0, 0.75);
-            backdrop-filter: blur(6px);
+            top: 8px;
+            left: 8px;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(8px);
             border: 1px solid rgba(255, 255, 255, 0.15);
             padding: 3px 8px;
-            border-radius: 6px;
+            border-radius: 4px;
             font-family: 'JetBrains Mono', monospace;
-            font-size: 0.72rem;
-            font-weight: 600;
+            font-size: 0.68rem;
+            font-weight: 700;
             color: #f8fafc;
             display: flex;
             align-items: center;
@@ -317,29 +362,244 @@
             z-index: 10;
         }
 
-        .camera-tag .dot {
-            width: 6px;
-            height: 6px;
+        .privacy-overlay-lock {
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at center, rgba(15, 23, 42, 0.95), rgba(6, 9, 16, 0.98));
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 20px;
+            text-align: center;
+            z-index: 25;
+            backdrop-filter: blur(8px);
+        }
+
+        .privacy-overlay-lock svg {
+            width: 32px;
+            height: 32px;
+            color: var(--accent-cyan);
+            opacity: 0.8;
+        }
+
+        .privacy-lock-title {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: #f8fafc;
+            letter-spacing: 0.5px;
+        }
+
+        .privacy-lock-sub {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            max-width: 240px;
+            line-height: 1.35;
         }
 
         .video-overlay-loader {
             position: absolute;
             inset: 0;
-            background: rgba(0, 0, 0, 0.75);
+            background: rgba(0, 0, 0, 0.8);
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 12px;
-            font-size: 0.85rem;
+            gap: 10px;
+            font-size: 0.82rem;
             color: var(--text-muted);
             font-family: 'JetBrains Mono', monospace;
             z-index: 20;
         }
 
+        /* Middle Section: GPS Map & Telemetry */
+        .card-middle-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            border-top: 1px solid var(--border-color);
+            background: #080d1a;
+            min-height: 220px;
+        }
+
+        .map-container {
+            width: 100%;
+            height: 240px;
+            background: #050811;
+            border-right: 1px solid var(--border-color);
+            position: relative;
+            overflow: hidden;
+            transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .map-container.expanded {
+            height: 480px;
+        }
+
+        .map-container .leaflet-tile.dark-tile {
+            filter: brightness(0.7) invert(1) contrast(2.5) hue-rotate(200deg) saturate(0.2) brightness(0.8);
+        }
+
+        .map-container .leaflet-tile.satellite-tile {
+            filter: none;
+        }
+
+        .map-toolbar {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            display: flex;
+            gap: 6px;
+            z-index: 600;
+        }
+
+        .btn-map-ctrl {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            color: #f8fafc;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+        }
+
+        .btn-map-ctrl:hover {
+            background: rgba(0, 242, 254, 0.25);
+            border-color: var(--accent-cyan);
+            color: var(--accent-cyan);
+        }
+
+        .map-privacy-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(8, 13, 26, 0.88);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 16px;
+            text-align: center;
+            z-index: 500;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            backdrop-filter: blur(4px);
+        }
+
+        .telemetry-panel {
+            padding: 14px 16px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            font-size: 0.82rem;
+        }
+
+        .telemetry-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .telem-box {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-color);
+            padding: 8px 10px;
+            border-radius: 6px;
+        }
+
+        .telem-label {
+            font-size: 0.68rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .telem-val {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            color: var(--accent-cyan);
+            font-weight: 700;
+            margin-top: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* 112 Police Dispatch Module */
+        .pcr-dispatch-module {
+            background: rgba(239, 68, 68, 0.05);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            border-radius: 8px;
+            padding: 10px 12px;
+            margin-top: 10px;
+        }
+
+        .pcr-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: #fca5a5;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .pcr-details {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .pcr-unit-name {
+            font-size: 0.85rem;
+            font-weight: 800;
+            color: #fff;
+        }
+
+        .btn-dispatch {
+            background: #ef4444;
+            color: white;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-size: 0.78rem;
+            font-weight: 800;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.35);
+        }
+
+        .btn-dispatch:hover {
+            background: #dc2626;
+        }
+
+        .btn-dispatch.dispatched {
+            background: #10b981;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);
+        }
+
+        .btn-dispatch.disabled {
+            background: rgba(255, 255, 255, 0.1);
+            color: #64748b;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        /* Card Footer & Control Actions */
         .target-card-footer {
             padding: 12px 18px;
-            background: rgba(0, 0, 0, 0.25);
+            background: rgba(0, 0, 0, 0.3);
             border-top: 1px solid var(--border-color);
             display: flex;
             justify-content: space-between;
@@ -347,90 +607,102 @@
             font-size: 0.8rem;
             color: var(--text-muted);
             flex-wrap: wrap;
-            gap: 10px;
+            gap: 8px;
         }
 
         .btn-action {
-            background: transparent;
+            background: rgba(255, 255, 255, 0.05);
             border: 1px solid var(--border-color);
             color: var(--text-main);
-            padding: 5px 12px;
+            padding: 6px 12px;
             border-radius: 6px;
             cursor: pointer;
             font-size: 0.78rem;
+            font-weight: 600;
             transition: all 0.2s ease;
         }
 
         .btn-action:hover {
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.12);
             border-color: rgba(255, 255, 255, 0.3);
         }
 
-        .btn-action.active {
-            background: rgba(0, 242, 254, 0.15);
-            border-color: var(--accent-cyan);
-            color: var(--accent-cyan);
+        .btn-action.emergency {
+            background: rgba(239, 68, 68, 0.15);
+            border-color: rgba(239, 68, 68, 0.5);
+            color: #fca5a5;
         }
 
-        @media (max-width: 768px) {
+        @media (max-width: 900px) {
             .targets-grid {
                 grid-template-columns: 1fr;
             }
-            .target-dual-grid {
+            .card-middle-section {
                 grid-template-columns: 1fr;
             }
-            header {
-                flex-direction: column;
-                gap: 12px;
-                align-items: flex-start;
+            .map-container {
+                border-right: none;
+                border-bottom: 1px solid var(--border-color);
             }
         }
     </style>
 </head>
 
 <body>
+    <!-- Main 112 Operations Header -->
     <header>
         <div class="brand">
             <div class="brand-icon">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                    <polygon points="23 7 16 12 23 17 23 7"></polygon>
-                    <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
                 </svg>
             </div>
             <div>
-                <div class="brand-title">OMNILINK LIVE</div>
+                <div class="brand-title">
+                    112 ERSS COMMAND CENTER
+                    <span class="brand-badge">STATE EMERGENCY OPERATIONS</span>
+                </div>
             </div>
         </div>
         <div class="status-bar">
             <div class="status-pill">
                 <span class="dot" id="serverDot"></span>
-                <span id="serverStatusText">CONNECTING...</span>
+                <span id="serverStatusText">DISPATCH ONLINE</span>
             </div>
             <div class="status-pill">
-                <span>TARGETS:</span>
+                <span>ACTIVE SOS INCIDENTS:</span>
+                <strong id="sosCount" style="color: var(--accent-red);">0</strong>
+            </div>
+            <div class="status-pill">
+                <span>ARMED STANDBY:</span>
                 <strong id="targetCount" style="color: var(--accent-cyan);">0</strong>
             </div>
         </div>
     </header>
 
-    <main>
-        <div class="target-url-banner">
-            <div>
-                <span class="target-url-label">TARGET INVITATION URL:</span>
-                <div class="url-box" id="targetUrlDisplay">Loading...</div>
-            </div>
-            <button class="btn-copy" onclick="copyTargetLink()">Copy Target Link</button>
+    <div class="top-ops-banner">
+        <div class="ops-meta">
+            <span>CAD FLEET ROUTING: <strong>AUTOMATED NEAREST 112 VEHICLE</strong></span>
+            <span>PRIVACY PROTOCOL: <strong>FEEDS STREAM ONLY UPON 3S SOS TRIGGER</strong></span>
         </div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <div class="url-box" id="targetUrlDisplay">Loading URL...</div>
+            <button class="btn-copy" onclick="copyTargetLink()">Copy Victim App Link</button>
+        </div>
+    </div>
 
+    <!-- Main Live Workspace -->
+    <main>
         <div class="targets-grid" id="targetsGrid">
             <div class="empty-state" id="emptyState">
                 <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                    <circle cx="12" cy="12" r="10"></circle>
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                     <line x1="12" y1="8" x2="12" y2="12"></line>
                     <line x1="12" y1="16" x2="12.01" y2="16"></line>
                 </svg>
-                <h3>No Active Targets</h3>
-                <p>Share the target link with remote users. When they click to verify, their live stream will appear here in real time.</p>
+                <h3>No Active 112 Emergency Targets Connected</h3>
+                <p>When citizens open the 112 SOS PWA and grant pre-armed access, they connect in standby mode. When they hold the emergency button for 3 seconds, their live front/rear camera feeds, audio stream, and real-time GPS coordinates unlock instantly for rapid police dispatch.</p>
+                <button class="btn-copy" style="padding: 8px 18px; font-size: 0.88rem;" onclick="copyTargetLink()">Copy 112 Victim PWA Link</button>
             </div>
         </div>
     </main>
@@ -440,20 +712,19 @@
         const host = window.location.host || "hangon-k31m.onrender.com";
         const wsUrl = `${protocol}//${host}/ws/controller`;
 
-        // Update target URL display
-        const targetFullUrl = `${window.location.protocol}//${host}/target`;
+        const targetFullUrl = `${window.location.protocol}//${host}/sos`;
         document.getElementById('targetUrlDisplay').innerText = targetFullUrl;
 
         function copyTargetLink() {
             navigator.clipboard.writeText(targetFullUrl).then(() => {
                 const btn = document.querySelector('.btn-copy');
                 const orig = btn.innerText;
-                btn.innerText = "Copied!";
+                btn.innerText = "Link Copied!";
                 setTimeout(() => btn.innerText = orig, 2000);
             });
         }
 
-        // WebRTC Config with low-latency candidate pooling, STUN & TURN relay fallback
+        // WebRTC Config
         const rtcConfig = {
             iceServers: [
                 { urls: "stun:stun.l.google.com:19302" },
@@ -469,11 +740,41 @@
 
         let ws;
         let pingInterval = null;
-        // Map of targetId -> { pc, mediaStream, pendingIce: [], cardEl, videoEl, loaderEl, badgeEl }
         const targets = new Map();
 
-        function updateTargetCount() {
+        // Siren Audio Alert
+        let audioCtx = null;
+        function playEmergencySiren() {
+            try {
+                const AudioClass = window.AudioContext || window.webkitAudioContext;
+                if (!audioCtx && AudioClass) audioCtx = new AudioClass();
+                if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+
+                if (audioCtx) {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.3);
+                    osc.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 0.6);
+
+                    gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                    gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.9);
+
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.9);
+                }
+            } catch (e) { }
+        }
+
+        function updateCounts() {
             document.getElementById('targetCount').innerText = targets.size;
+            let sosCount = 0;
+            targets.forEach(s => { if (s.isSos) sosCount++; });
+            document.getElementById('sosCount').innerText = sosCount;
+
             const emptyState = document.getElementById('emptyState');
             if (targets.size === 0) {
                 emptyState.style.display = 'block';
@@ -482,7 +783,8 @@
             }
         }
 
-        function ensureTargetSession(targetId) {
+        // Create or Retrieve Target Session UI
+        function ensureTargetSession(targetId, initialMeta = {}) {
             let session = targets.get(targetId);
             if (session) return session;
 
@@ -490,54 +792,123 @@
             const card = document.createElement('div');
             card.className = 'target-card';
             card.id = `card-${targetId}`;
+            
             card.innerHTML = `
                 <div class="target-card-header">
                     <div class="target-id">
-                        <span class="dot"></span>
-                        TARGET [${targetId}] &bull; DUAL CAMERAS
+                        <span class="dot standby" id="dot-status-${targetId}"></span>
+                        INCIDENT [${targetId}] &bull; <span id="header-status-${targetId}">STANDBY (ARMED)</span>
                     </div>
-                    <span class="target-status-badge" id="badge-${targetId}">CONNECTING</span>
+                    <span class="target-status-badge" id="badge-${targetId}">🔒 STANDBY (PRIVACY SECURED)</span>
                 </div>
                 
-                <div class="target-dual-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: #050914; padding: 10px; border-radius: 8px; position: relative;">
+                <div class="target-dual-grid">
                     <!-- Front Camera Window -->
-                    <div class="camera-pane" id="pane-front-${targetId}" onclick="switchCamera('${targetId}', 'user')" style="position: relative; aspect-ratio: 16 / 9; background: #000; border-radius: 6px; overflow: hidden; border: 2px solid #00f2fe; cursor: pointer; transition: all 0.3s ease;">
-                        <div class="camera-tag" style="position: absolute; top: 8px; left: 8px; z-index: 10; background: rgba(0,0,0,0.8); backdrop-filter: blur(6px); padding: 3px 8px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; color: #fff; display: flex; align-items: center; gap: 5px;">
-                            <span class="dot" id="dot-front-${targetId}" style="width: 6px; height: 6px; background: #00f2fe; box-shadow: 0 0 8px #00f2fe;"></span>
-                            <span id="label-front-${targetId}">FRONT CAM <b style="color: #00f2fe;">(LIVE)</b></span>
+                    <div class="camera-pane" id="pane-front-${targetId}" onclick="switchCamera('${targetId}', 'user')" style="border: 2px solid #00f2fe;">
+                        <div class="camera-tag">
+                            <span class="dot" id="dot-front-${targetId}" style="width: 6px; height: 6px; background: #00f2fe;"></span>
+                            <span id="label-front-${targetId}">FRONT LENS <b style="color: #00f2fe;">(LIVE)</b></span>
                         </div>
-                        <video id="video-front-${targetId}" autoplay playsinline muted style="width: 100%; height: 100%; object-fit: cover;"></video>
-                        <canvas id="canvas-front-${targetId}" style="display: none; width: 100%; height: 100%; object-fit: cover;"></canvas>
-                        <div class="video-overlay-loader" id="loader-${targetId}">
+                        <video id="video-front-${targetId}" autoplay playsinline muted></video>
+                        <canvas id="canvas-front-${targetId}" style="display: none;"></canvas>
+                        
+                        <!-- Privacy Lock Overlay (Visible until SOS is triggered) -->
+                        <div class="privacy-overlay-lock" id="lock-overlay-front-${targetId}">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                            <div class="privacy-lock-title">PRIVACY PROTECTED</div>
+                            <div class="privacy-lock-sub">Camera feed unlocks ONLY when victim holds 3s SOS button</div>
+                        </div>
+
+                        <div class="video-overlay-loader" id="loader-${targetId}" style="display: none;">
                             <div class="dot" style="animation-duration: 0.8s;"></div>
-                            <span>Connecting Streams...</span>
+                            <span>Connecting 112 Feed...</span>
                         </div>
                     </div>
 
                     <!-- Rear Camera Window -->
-                    <div class="camera-pane" id="pane-rear-${targetId}" onclick="switchCamera('${targetId}', 'environment')" style="position: relative; aspect-ratio: 16 / 9; background: #000; border-radius: 6px; overflow: hidden; border: 1px solid rgba(255,255,255,0.15); cursor: pointer; transition: all 0.3s ease;">
-                        <div class="camera-tag" style="position: absolute; top: 8px; left: 8px; z-index: 10; background: rgba(0,0,0,0.8); backdrop-filter: blur(6px); padding: 3px 8px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; color: #fff; display: flex; align-items: center; gap: 5px;">
+                    <div class="camera-pane" id="pane-rear-${targetId}" onclick="switchCamera('${targetId}', 'environment')" style="border: 1px solid rgba(255,255,255,0.15);">
+                        <div class="camera-tag">
                             <span class="dot" id="dot-rear-${targetId}" style="width: 6px; height: 6px; background: #94a3b8; box-shadow: none;"></span>
-                            <span id="label-rear-${targetId}">REAR CAM <span style="color: #94a3b8;">(SNAPSHOT)</span></span>
+                            <span id="label-rear-${targetId}">REAR LENS <span style="color: #94a3b8;">(SNAPSHOT)</span></span>
                         </div>
-                        <video id="video-rear-${targetId}" autoplay playsinline muted style="display: none; width: 100%; height: 100%; object-fit: cover;"></video>
-                        <canvas id="canvas-rear-${targetId}" style="width: 100%; height: 100%; object-fit: cover; background: #080e1a;"></canvas>
+                        <video id="video-rear-${targetId}" autoplay playsinline muted style="display: none;"></video>
+                        <canvas id="canvas-rear-${targetId}" style="background: #080e1a;"></canvas>
+
+                        <!-- Privacy Lock Overlay for Rear -->
+                        <div class="privacy-overlay-lock" id="lock-overlay-rear-${targetId}">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                            <div class="privacy-lock-title">STANDBY MODE</div>
+                            <div class="privacy-lock-sub">Waiting for SOS trigger</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- GPS & CAD Dispatch Panel -->
+                <div class="card-middle-section">
+                    <div class="map-container" id="map-${targetId}">
+                        <div class="map-toolbar" id="map-toolbar-${targetId}">
+                            <button class="btn-map-ctrl" onclick="recenterMap('${targetId}')" title="Fly to victim location">🎯 Center</button>
+                            <button class="btn-map-ctrl" id="layerBtn-${targetId}" onclick="cycleMapLayer('${targetId}')" title="Switch between Dark, Street, and Satellite views">🛰️ Satellite</button>
+                            <button class="btn-map-ctrl" id="expandBtn-${targetId}" onclick="toggleExpandMap('${targetId}')" title="Expand / Minimize map view">⛶ Expand</button>
+                        </div>
+                        <div class="map-privacy-overlay" id="map-lock-${targetId}">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--accent-cyan); margin-bottom: 4px;"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                            <strong style="color: #fff;">GPS Location Locked</strong>
+                            <span>Real-time coordinates stream only upon 3-second SOS hold</span>
+                        </div>
+                    </div>
+                    <div class="telemetry-panel">
+                        <div class="telemetry-grid">
+                            <div class="telem-box">
+                                <div class="telem-label">GPS Coordinates</div>
+                                <div class="telem-val" id="coords-${targetId}">🔒 STANDBY</div>
+                            </div>
+                            <div class="telem-box">
+                                <div class="telem-label">Accuracy / Speed</div>
+                                <div class="telem-val" id="acc-${targetId}">🔒 RESTRICTED</div>
+                            </div>
+                            <div class="telem-box">
+                                <div class="telem-label">Battery Level</div>
+                                <div class="telem-val" id="battery-${targetId}">--</div>
+                            </div>
+                            <div class="telem-box">
+                                <div class="telem-label">CAD Dispatch Unit</div>
+                                <div class="telem-val" id="pcr-status-${targetId}" style="color: #f59e0b;">Standby (Ready)</div>
+                            </div>
+                        </div>
+
+                        <!-- 112 Nearest Vehicle Dispatch Box -->
+                        <div class="pcr-dispatch-module" id="pcr-box-${targetId}">
+                            <div class="pcr-header">
+                                <span>NEAREST 112 PATROL FLEET</span>
+                                <span id="pcr-dist-${targetId}">CALCULATING...</span>
+                            </div>
+                            <div class="pcr-details">
+                                <div>
+                                    <div class="pcr-unit-name" id="pcr-unit-${targetId}">PCR-112 PATROL</div>
+                                    <div style="font-size: 0.72rem; color: #94a3b8;" id="pcr-officer-${targetId}">Command Unit Assigned</div>
+                                </div>
+                                <button class="btn-dispatch disabled" id="btn-dispatch-${targetId}" onclick="dispatchPcrVehicle('${targetId}')">
+                                    🚨 Dispatch 112 PCR
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
                 <div class="target-card-footer">
-                    <span id="time-${targetId}">Both Cameras Ready</span>
-                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                        <button class="btn-action" id="camBtn-${targetId}" onclick="toggleActiveCamera('${targetId}')">🔄 Switch to Rear Camera</button>
-                        <button class="btn-action" id="cycleBtn-${targetId}" onclick="toggleAutoCycle('${targetId}')">🔁 Auto-Cycle: OFF</button>
-                        <button class="btn-action" id="fitBtn-${targetId}" onclick="toggleFovFit('${targetId}')">📐 View: Full Wide (Contain)</button>
-                        <button class="btn-action" id="zoomBtn-${targetId}" onclick="cycleZoomLevel('${targetId}')">🔍 Zoom: 1x</button>
+                    <span id="time-${targetId}">Status: Standby (Armed)</span>
+                    <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                        <button class="btn-action" id="camBtn-${targetId}" onclick="toggleActiveCamera('${targetId}')">🔄 Switch Lens</button>
                         <button class="btn-action" id="muteBtn-${targetId}" onclick="toggleMute('${targetId}')">🔊 Unmute Audio</button>
-                        <button class="btn-action" onclick="requestTargetOffer('${targetId}')">Reconnect</button>
+                        <button class="btn-action" id="fitBtn-${targetId}" onclick="toggleFovFit('${targetId}')">📐 View: Fill</button>
+                        <button class="btn-action" id="zoomBtn-${targetId}" onclick="cycleZoomLevel('${targetId}')">🔍 Zoom: 1x</button>
+                        <button class="btn-action emergency" onclick="shareLiveSurveillanceLink('${targetId}')">📡 Share Link with PCR</button>
                         <button class="btn-action" onclick="fullscreenVideo('${targetId}')">Fullscreen</button>
                     </div>
                 </div>
             `;
+
             grid.appendChild(card);
 
             const videoFront = card.querySelector(`#video-front-${targetId}`);
@@ -549,6 +920,47 @@
 
             videoFront.muted = true;
             videoRear.muted = true;
+
+            // Initialize Leaflet Map for this target with full free interactive controls
+            let mapInstance = null;
+            let markerInstance = null;
+            let circleInstance = null;
+            let currentLayerName = 'dark';
+            let activeLayer = null;
+
+            try {
+                const mapEl = card.querySelector(`#map-${targetId}`);
+                mapInstance = L.map(mapEl, {
+                    zoomControl: true,
+                    attributionControl: false,
+                    dragging: true,
+                    touchZoom: true,
+                    scrollWheelZoom: true,
+                    doubleClickZoom: true,
+                    boxZoom: true
+                }).setView([28.6139, 77.2090], 14);
+
+                activeLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    className: 'dark-tile'
+                }).addTo(mapInstance);
+
+                // Free click inspector on map to measure distance & inspect roads
+                mapInstance.on('click', function(e) {
+                    const session = targets.get(targetId);
+                    let distanceText = "";
+                    if (session && session.gps) {
+                        const d = mapInstance.distance([session.gps.lat, session.gps.lng], [e.latlng.lat, e.latlng.lng]);
+                        distanceText = `<br><b style="color:#00f2fe;">${(d < 1000 ? Math.round(d) + 'm' : (d/1000).toFixed(2) + 'km')} from Victim</b>`;
+                    }
+                    L.popup()
+                        .setLatLng(e.latlng)
+                        .setContent(`<div style="font-family:'JetBrains Mono',monospace; font-size:0.75rem; color:#0f172a;"><b>📍 Target Point:</b><br>${e.latlng.lat.toFixed(5)}, ${e.latlng.lng.toFixed(5)}${distanceText}</div>`)
+                        .openOn(mapInstance);
+                });
+            } catch (e) {
+                console.warn("Leaflet map init note:", e);
+            }
 
             session = {
                 pc: null,
@@ -562,13 +974,93 @@
                 loaderEl,
                 badgeEl,
                 activeCamera: 'user',
-                cycleInterval: null,
-                snapshotTimer: null
+                isSos: false,
+                mapInstance,
+                markerInstance,
+                circleInstance,
+                activeLayer,
+                currentLayerName: 'dark',
+                isMapExpanded: false,
+                gps: null,
+                pcrAssigned: null
             };
+
             targets.set(targetId, session);
             drawPlaceholder(canvasRear, "REAR CAMERA (CLICK TO ACTIVATE)");
-            updateTargetCount();
+            assignNearestPcrUnit(targetId);
+            updateCounts();
             return session;
+        }
+
+        // Free Map Control Functions
+        function recenterMap(targetId) {
+            const session = targets.get(targetId);
+            if (!session || !session.mapInstance) return;
+
+            if (session.gps && session.gps.lat && session.gps.lng) {
+                session.mapInstance.flyTo([session.gps.lat, session.gps.lng], 17, { duration: 1.2 });
+            } else {
+                session.mapInstance.flyTo([28.6139, 77.2090], 14, { duration: 1.0 });
+            }
+        }
+
+        function cycleMapLayer(targetId) {
+            const session = targets.get(targetId);
+            if (!session || !session.mapInstance) return;
+
+            const btn = document.getElementById(`layerBtn-${targetId}`);
+            if (session.activeLayer) {
+                session.mapInstance.removeLayer(session.activeLayer);
+            }
+
+            if (session.currentLayerName === 'dark') {
+                // Switch to Satellite Imagery
+                session.currentLayerName = 'satellite';
+                session.activeLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                    maxZoom: 19,
+                    className: 'satellite-tile'
+                }).addTo(session.mapInstance);
+                if (btn) btn.innerText = "🏙️ Street";
+            } else if (session.currentLayerName === 'satellite') {
+                // Switch to Standard Street Map (Daylight OSM)
+                session.currentLayerName = 'street';
+                session.activeLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    className: 'satellite-tile'
+                }).addTo(session.mapInstance);
+                if (btn) btn.innerText = "🌙 Dark";
+            } else {
+                // Switch to Tactical Dark Mode
+                session.currentLayerName = 'dark';
+                session.activeLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    className: 'dark-tile'
+                }).addTo(session.mapInstance);
+                if (btn) btn.innerText = "🛰️ Satellite";
+            }
+        }
+
+        function toggleExpandMap(targetId) {
+            const session = targets.get(targetId);
+            const mapEl = document.getElementById(`map-${targetId}`);
+            const btn = document.getElementById(`expandBtn-${targetId}`);
+            if (!session || !mapEl || !session.mapInstance) return;
+
+            session.isMapExpanded = !session.isMapExpanded;
+            if (session.isMapExpanded) {
+                mapEl.classList.add('expanded');
+                if (btn) btn.innerText = "⛶ Minimize";
+            } else {
+                mapEl.classList.remove('expanded');
+                if (btn) btn.innerText = "⛶ Expand";
+            }
+
+            setTimeout(() => {
+                session.mapInstance.invalidateSize();
+                if (session.gps) {
+                    session.mapInstance.panTo([session.gps.lat, session.gps.lng]);
+                }
+            }, 320);
         }
 
         function drawPlaceholder(canvas, text) {
@@ -579,7 +1071,6 @@
             ctx.fillStyle = '#050914';
             ctx.fillRect(0, 0, 640, 360);
             
-            // Draw camera outline icon
             ctx.strokeStyle = '#334155';
             ctx.lineWidth = 2;
             ctx.strokeRect(280, 120, 80, 50);
@@ -593,6 +1084,152 @@
             ctx.fillText(text, 320, 200);
         }
 
+        // Nearest 112 Police Patrol Unit Simulation
+        const PCR_UNITS = [
+            { id: "PCR-112-ALPHA", name: "Patrol Van Alpha (North)", officer: "Insp. Sharma", dist: 1.2, eta: "3 mins" },
+            { id: "PCR-112-BRAVO", name: "Emergency Response Van 04", officer: "Sub-Insp. Verma", dist: 2.1, eta: "5 mins" },
+            { id: "PCR-112-CHARLIE", name: "Quick Response Unit 12", officer: "Officer Khan", dist: 0.9, eta: "2 mins" },
+            { id: "PCR-112-DELTA", name: "Highway Interceptor 07", officer: "Insp. Patel", dist: 3.4, eta: "7 mins" }
+        ];
+
+        function assignNearestPcrUnit(targetId) {
+            const randomUnit = PCR_UNITS[Math.floor(Math.random() * PCR_UNITS.length)];
+            const session = targets.get(targetId);
+            if (session) session.pcrAssigned = randomUnit;
+
+            const unitEl = document.getElementById(`pcr-unit-${targetId}`);
+            const distEl = document.getElementById(`pcr-dist-${targetId}`);
+            const officerEl = document.getElementById(`pcr-officer-${targetId}`);
+
+            if (unitEl) unitEl.innerText = `${randomUnit.id} - ${randomUnit.name}`;
+            if (distEl) distEl.innerText = `${randomUnit.dist} KM (${randomUnit.eta} ETA)`;
+            if (officerEl) officerEl.innerText = `Officer: ${randomUnit.officer}`;
+        }
+
+        function dispatchPcrVehicle(targetId) {
+            const session = targets.get(targetId);
+            if (!session || !session.pcrAssigned) return;
+            if (!session.isSos) {
+                alert("Target is in standby mode. 112 PCR dispatch unlocks when victim triggers emergency SOS.");
+                return;
+            }
+
+            const btn = document.getElementById(`btn-dispatch-${targetId}`);
+            const statusEl = document.getElementById(`pcr-status-${targetId}`);
+
+            btn.innerText = "✓ DISPATCHED & EN ROUTE";
+            btn.classList.add('dispatched');
+            if (statusEl) {
+                statusEl.innerText = `${session.pcrAssigned.id} (En Route)`;
+                statusEl.style.color = '#10b981';
+            }
+
+            // Send notification back to victim app
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    targetId,
+                    type: "dispatch_pcr",
+                    vehicleId: session.pcrAssigned.id,
+                    eta: session.pcrAssigned.eta
+                }));
+            }
+
+            alert(`🚨 112 DISPATCH CONFIRMED:\nUnit: ${session.pcrAssigned.id}\nOfficer: ${session.pcrAssigned.officer}\nETA: ${session.pcrAssigned.eta}\nLive victim video and GPS routed to patrol vehicle screen!`);
+        }
+
+        function shareLiveSurveillanceLink(targetId) {
+            const link = `${window.location.origin}/dashboard?target=${targetId}`;
+            navigator.clipboard.writeText(link).then(() => {
+                alert(`📡 Live Surveillance Link for 112 Patrol Vehicle Copied:\n${link}`);
+            });
+        }
+
+        // Update GPS on Leaflet Map
+        function updateTargetGps(targetId, gps) {
+            const session = targets.get(targetId);
+            if (!session || !gps) return;
+            session.gps = gps;
+
+            const coordsEl = document.getElementById(`coords-${targetId}`);
+            const accEl = document.getElementById(`acc-${targetId}`);
+
+            if (coordsEl) coordsEl.innerText = `${gps.lat.toFixed(5)}, ${gps.lng.toFixed(5)}`;
+            if (accEl) accEl.innerText = `±${gps.accuracy}m | ${gps.speed ? Math.round(gps.speed * 3.6) : 0} km/h`;
+
+            if (session.mapInstance) {
+                const latlng = [gps.lat, gps.lng];
+                session.mapInstance.setView(latlng, 16);
+
+                if (!session.markerInstance) {
+                    const customIcon = L.divIcon({
+                        className: 'custom-map-pin',
+                        html: `<div style="width: 18px; height: 18px; background: #ef4444; border: 3px solid #fff; border-radius: 50%; box-shadow: 0 0 15px #ef4444;"></div>`,
+                        iconSize: [18, 18],
+                        iconAnchor: [9, 9]
+                    });
+                    session.markerInstance = L.marker(latlng, { icon: customIcon }).addTo(session.mapInstance);
+                    session.circleInstance = L.circle(latlng, {
+                        radius: gps.accuracy || 15,
+                        color: '#ef4444',
+                        fillColor: '#ef4444',
+                        fillOpacity: 0.15
+                    }).addTo(session.mapInstance);
+                } else {
+                    session.markerInstance.setLatLng(latlng);
+                    if (session.circleInstance) {
+                        session.circleInstance.setLatLng(latlng);
+                        session.circleInstance.setRadius(gps.accuracy || 15);
+                    }
+                }
+                session.mapInstance.invalidateSize();
+            }
+        }
+
+        // Mark Target as Emergency SOS Active (Unlocks video, audio & GPS!)
+        function markTargetSosActive(targetId, gps, battery) {
+            const session = ensureTargetSession(targetId);
+            session.isSos = true;
+
+            session.cardEl.classList.add('sos-active');
+            session.badgeEl.className = 'target-status-badge sos';
+            session.badgeEl.innerText = '🚨 112 SOS TRIGGERED (LIVE)';
+
+            const headerStatusEl = document.getElementById(`header-status-${targetId}`);
+            if (headerStatusEl) headerStatusEl.innerHTML = `<b style="color: #ef4444;">EMERGENCY SOS ACTIVE</b>`;
+
+            const dotEl = document.getElementById(`dot-status-${targetId}`);
+            if (dotEl) dotEl.className = 'dot sos-beacon';
+
+            // Remove Privacy Lock Overlays
+            const frontLock = document.getElementById(`lock-overlay-front-${targetId}`);
+            const rearLock = document.getElementById(`lock-overlay-rear-${targetId}`);
+            const mapLock = document.getElementById(`map-lock-${targetId}`);
+            if (frontLock) frontLock.style.display = 'none';
+            if (rearLock) rearLock.style.display = 'none';
+            if (mapLock) mapLock.style.display = 'none';
+
+            // Enable 112 Dispatch Button
+            const dispatchBtn = document.getElementById(`btn-dispatch-${targetId}`);
+            if (dispatchBtn) dispatchBtn.classList.remove('disabled');
+
+            const pcrStatusEl = document.getElementById(`pcr-status-${targetId}`);
+            if (pcrStatusEl) {
+                pcrStatusEl.innerText = `Emergency (Ready for Dispatch)`;
+                pcrStatusEl.style.color = '#ef4444';
+            }
+
+            if (battery) {
+                const bEl = document.getElementById(`battery-${targetId}`);
+                if (bEl) bEl.innerText = `${battery.level}% ${battery.charging ? '⚡' : ''}`;
+            }
+
+            if (gps) updateTargetGps(targetId, gps);
+
+            playEmergencySiren();
+            updateCounts();
+        }
+
+        // WebRTC Camera Controls
         function captureCurrentActiveSnapshot(session) {
             try {
                 if (session.activeCamera === 'user' && session.videoFront && session.canvasFront) {
@@ -602,7 +1239,6 @@
                         session.canvasFront.width = video.videoWidth;
                         session.canvasFront.height = video.videoHeight;
                         ctx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
-                        console.log("[+] Captured Front Camera snapshot");
                     }
                 } else if (session.activeCamera === 'environment' && session.videoRear && session.canvasRear) {
                     const video = session.videoRear;
@@ -611,12 +1247,9 @@
                         session.canvasRear.width = video.videoWidth;
                         session.canvasRear.height = video.videoHeight;
                         ctx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
-                        console.log("[+] Captured Rear Camera snapshot");
                     }
                 }
-            } catch (e) {
-                console.warn("Snapshot capture note:", e);
-            }
+            } catch (e) { }
         }
 
         function toggleActiveCamera(targetId) {
@@ -631,13 +1264,11 @@
 
             const nextCam = specificMode || (session.activeCamera === 'environment' ? 'user' : 'environment');
             const btn = document.getElementById(`camBtn-${targetId}`);
-            if (btn) btn.innerText = "⏳ Switching...";
+            if (btn) btn.innerText = "⏳ Switching Lens...";
 
-            // Capture snapshot of the current active camera before sending the switch command
             captureCurrentActiveSnapshot(session);
 
             if (ws && ws.readyState === WebSocket.OPEN) {
-                console.log(`[*] Sending switch_camera to target ${targetId}: ${nextCam}`);
                 ws.send(JSON.stringify({
                     targetId,
                     type: "switch_camera",
@@ -646,45 +1277,9 @@
             }
         }
 
-        function toggleAutoCycle(targetId) {
-            const session = targets.get(targetId);
-            if (!session) return;
-
-            const btn = document.getElementById(`cycleBtn-${targetId}`);
-            if (session.cycleInterval) {
-                clearInterval(session.cycleInterval);
-                session.cycleInterval = null;
-                if (btn) {
-                    btn.innerText = "🔁 Auto-Cycle: OFF";
-                    btn.classList.remove('active');
-                }
-            } else {
-                if (btn) {
-                    btn.innerText = "🔁 Auto-Cycle: ON (4s)";
-                    btn.classList.add('active');
-                }
-                session.cycleInterval = setInterval(() => {
-                    toggleActiveCamera(targetId);
-                }, 4000);
-            }
-        }
-
         function updateCameraUI(targetId, activeCam, label, error) {
             const session = targets.get(targetId);
             if (!session) return;
-
-            // Capture snapshot of previous active camera before switching views
-            if (session.activeCamera === 'user' && session.videoFront && session.videoFront.videoWidth > 0) {
-                const ctx = session.canvasFront.getContext('2d');
-                session.canvasFront.width = session.videoFront.videoWidth;
-                session.canvasFront.height = session.videoFront.videoHeight;
-                ctx.drawImage(session.videoFront, 0, 0, session.canvasFront.width, session.canvasFront.height);
-            } else if (session.activeCamera === 'environment' && session.videoRear && session.videoRear.videoWidth > 0) {
-                const ctx = session.canvasRear.getContext('2d');
-                session.canvasRear.width = session.videoRear.videoWidth;
-                session.canvasRear.height = session.videoRear.videoHeight;
-                ctx.drawImage(session.videoRear, 0, 0, session.canvasRear.width, session.canvasRear.height);
-            }
 
             session.activeCamera = activeCam;
             const btn = document.getElementById(`camBtn-${targetId}`);
@@ -694,28 +1289,16 @@
             const dotRear = document.getElementById(`dot-rear-${targetId}`);
             const labelFront = document.getElementById(`label-front-${targetId}`);
             const labelRear = document.getElementById(`label-rear-${targetId}`);
-            const timeLabel = document.getElementById(`time-${targetId}`);
-
-            if (error) {
-                if (timeLabel) {
-                    timeLabel.innerText = `⚠ ${error}`;
-                    timeLabel.style.color = '#ef4444';
-                }
-            } else if (label && timeLabel) {
-                timeLabel.innerText = `Active Lens: ${label}`;
-                timeLabel.style.color = '#94a3b8';
-            }
 
             if (activeCam === 'environment') {
-                if (btn) btn.innerText = "🔄 Switch to Front Camera";
+                if (btn) btn.innerText = "🔄 Switch to Front Lens";
                 if (paneFront) paneFront.style.border = "1px solid rgba(255,255,255,0.15)";
                 if (paneRear) paneRear.style.border = "2px solid #10b981";
                 if (dotFront) { dotFront.style.background = "#94a3b8"; dotFront.style.boxShadow = "none"; }
                 if (dotRear) { dotRear.style.background = "#10b981"; dotRear.style.boxShadow = "0 0 8px #10b981"; }
-                if (labelFront) labelFront.innerHTML = 'FRONT CAM <span style="color: #94a3b8;">(SNAPSHOT)</span>';
-                if (labelRear) labelRear.innerHTML = 'REAR CAM <b style="color: #10b981;">(LIVE)</b>';
+                if (labelFront) labelFront.innerHTML = 'FRONT LENS <span style="color: #94a3b8;">(SNAPSHOT)</span>';
+                if (labelRear) labelRear.innerHTML = 'REAR LENS <b style="color: #10b981;">(LIVE)</b>';
 
-                // Display snapshot canvas on front, live video on rear
                 if (session.canvasFront) session.canvasFront.style.display = 'block';
                 if (session.videoFront) session.videoFront.style.display = 'none';
 
@@ -729,15 +1312,14 @@
                 }
                 session.videoEl = session.videoRear;
             } else {
-                if (btn) btn.innerText = "🔄 Switch to Rear Camera";
+                if (btn) btn.innerText = "🔄 Switch to Rear Lens";
                 if (paneFront) paneFront.style.border = "2px solid #00f2fe";
                 if (paneRear) paneRear.style.border = "1px solid rgba(255,255,255,0.15)";
                 if (dotFront) { dotFront.style.background = "#00f2fe"; dotFront.style.boxShadow = "0 0 8px #00f2fe"; }
                 if (dotRear) { dotRear.style.background = "#94a3b8"; dotRear.style.boxShadow = "none"; }
-                if (labelFront) labelFront.innerHTML = 'FRONT CAM <b style="color: #00f2fe;">(LIVE)</b>';
-                if (labelRear) labelRear.innerHTML = 'REAR CAM <span style="color: #94a3b8;">(SNAPSHOT)</span>';
+                if (labelFront) labelFront.innerHTML = 'FRONT LENS <b style="color: #00f2fe;">(LIVE)</b>';
+                if (labelRear) labelRear.innerHTML = 'REAR LENS <span style="color: #94a3b8;">(SNAPSHOT)</span>';
 
-                // Display snapshot canvas on rear, live video on front
                 if (session.canvasRear) session.canvasRear.style.display = 'block';
                 if (session.videoRear) session.videoRear.style.display = 'none';
 
@@ -753,22 +1335,7 @@
             }
         }
 
-        function requestTargetOffer(targetId) {
-            const session = targets.get(targetId);
-            if (session) {
-                session.loaderEl.style.display = 'flex';
-                session.badgeEl.innerText = 'CONNECTING';
-                session.badgeEl.style.color = '#00f2fe';
-            }
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                console.log(`[*] Requesting fresh offer from target: ${targetId}`);
-                ws.send(JSON.stringify({
-                    targetId,
-                    type: "request_offer"
-                }));
-            }
-        }
-
+        // WebSocket Connection
         function connectWebSocket() {
             const serverDot = document.getElementById('serverDot');
             const serverStatusText = document.getElementById('serverStatusText');
@@ -783,9 +1350,8 @@
             ws = new WebSocket(wsUrl);
 
             ws.onopen = () => {
-                console.log("[+] Controller connected to signaling server");
                 serverDot.classList.remove('offline');
-                serverStatusText.innerText = "ONLINE";
+                serverStatusText.innerText = "DISPATCH ONLINE";
 
                 if (pingInterval) clearInterval(pingInterval);
                 pingInterval = setInterval(() => {
@@ -798,57 +1364,56 @@
             ws.onmessage = async (event) => {
                 try {
                     const msg = JSON.parse(event.data);
+                    if (msg.type === "pong") return;
 
-                    if (msg.type === "pong") {
-                        return;
-                    }
-                    
                     if (msg.type === "active_targets") {
-                        console.log("[*] Active targets received:", msg.targets);
                         msg.targets.forEach(targetId => {
                             ensureTargetSession(targetId);
-                            requestTargetOffer(targetId);
                         });
+                        if (msg.targets_data) {
+                            msg.targets_data.forEach(meta => {
+                                if (meta.sos_active) markTargetSosActive(meta.targetId, meta.gps, meta.battery);
+                            });
+                        }
                     } else if (msg.type === "target_joined") {
-                        console.log("[+] Target joined:", msg.targetId);
                         ensureTargetSession(msg.targetId);
-                        requestTargetOffer(msg.targetId);
                     } else if (msg.type === "target_left") {
-                        console.log("[-] Target left:", msg.targetId);
                         removeTargetSession(msg.targetId);
+                    } else if (msg.type === "sos_alert") {
+                        markTargetSosActive(msg.targetId, msg.gps, msg.battery);
+                    } else if (msg.type === "gps_update") {
+                        if (msg.is_sos) {
+                            markTargetSosActive(msg.targetId, msg.gps);
+                        }
                     } else if (msg.type === "camera_info" && msg.targetId) {
                         updateCameraUI(msg.targetId, msg.camera, msg.label, msg.error);
                     } else if (msg.type === "offer" && msg.targetId) {
-                        console.log("[+] Received offer from target:", msg.targetId);
+                        markTargetSosActive(msg.targetId, msg.gps);
                         await handleTargetOffer(msg.targetId, msg.data);
                     } else if (msg.type === "ice" && msg.targetId) {
                         const session = ensureTargetSession(msg.targetId);
                         if (session.pc && session.pc.remoteDescription && session.pc.remoteDescription.type) {
                             try {
                                 await session.pc.addIceCandidate(msg.data);
-                            } catch (e) {
-                                console.warn("Failed to add ICE candidate:", e);
-                            }
+                            } catch (e) { }
                         } else {
                             session.pendingIce.push(msg.data);
                         }
                     }
                 } catch (e) {
-                    console.error("Error processing controller message:", e);
+                    console.error("Controller message error:", e);
                 }
             };
 
-            ws.onerror = (err) => {
-                console.error("Signaling socket error:", err);
+            ws.onerror = () => {
                 serverDot.classList.add('offline');
                 serverStatusText.innerText = "ERROR";
             };
 
             ws.onclose = () => {
-                console.log("Signaling closed. Reconnecting in 1.5s...");
                 if (pingInterval) clearInterval(pingInterval);
                 serverDot.classList.add('offline');
-                serverStatusText.innerText = "RECONNECTING";
+                serverStatusText.innerText = "RECONNECTING...";
                 setTimeout(connectWebSocket, 1500);
             };
         }
@@ -860,19 +1425,14 @@
                 try {
                     session.pc.ontrack = null;
                     session.pc.onicecandidate = null;
-                    session.pc.onconnectionstatechange = null;
                     session.pc.close();
-                } catch (e) {
-                    console.warn("Error closing previous controller pc:", e);
-                }
+                } catch (e) { }
             }
 
             const pc = new RTCPeerConnection(rtcConfig);
             session.pc = pc;
 
             pc.ontrack = (event) => {
-                console.log(`[+] Track received from target ${targetId}:`, event.track.kind);
-                
                 let stream = session.activeStream;
                 if (!stream || !(stream instanceof MediaStream)) {
                     stream = new MediaStream();
@@ -892,9 +1452,7 @@
                 }
 
                 if (event.track.kind === 'video') {
-                    session.loaderEl.style.display = 'none';
-                    session.badgeEl.innerText = 'LIVE STREAMING';
-                    session.badgeEl.style.color = '#10b981';
+                    if (session.loaderEl) session.loaderEl.style.display = 'none';
                 }
             };
 
@@ -909,35 +1467,24 @@
             };
 
             pc.onconnectionstatechange = () => {
-                console.log(`[*] Target ${targetId} Connection State:`, pc.connectionState);
                 if (pc.connectionState === "connected") {
-                    session.loaderEl.style.display = 'none';
-                    session.badgeEl.innerText = 'LIVE STREAMING';
-                    session.badgeEl.style.color = '#10b981';
-                } else if (pc.connectionState === "failed" || pc.connectionState === "disconnected") {
-                    session.badgeEl.innerText = 'RECONNECTING';
-                    session.badgeEl.style.color = '#f59e0b';
+                    if (session.loaderEl) session.loaderEl.style.display = 'none';
                 }
             };
 
-            // Set remote offer & send answer
             await pc.setRemoteDescription(new RTCSessionDescription(offerSdp));
 
-            // Flush any pending candidates safely
             while (session.pendingIce.length > 0) {
                 const cand = session.pendingIce.shift();
                 try {
                     await pc.addIceCandidate(cand);
-                } catch (e) {
-                    console.warn("Failed to add queued candidate:", e);
-                }
+                } catch (e) { }
             }
 
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
 
             if (ws && ws.readyState === WebSocket.OPEN) {
-                console.log(`[+] Dispatched answer for target: ${targetId}`);
                 ws.send(JSON.stringify({
                     targetId,
                     type: "answer",
@@ -949,7 +1496,6 @@
         function removeTargetSession(targetId) {
             const session = targets.get(targetId);
             if (!session) return;
-
             try {
                 if (session.pc) session.pc.close();
             } catch (e) {}
@@ -957,7 +1503,7 @@
                 session.cardEl.remove();
             }
             targets.delete(targetId);
-            updateTargetCount();
+            updateCounts();
         }
 
         function toggleMute(targetId) {
@@ -1019,7 +1565,6 @@
         function fullscreenVideo(targetId) {
             const session = targets.get(targetId);
             if (!session) return;
-
             const activeVideo = session.activeCamera === 'environment' ? session.videoRear : session.videoFront;
             if (activeVideo) {
                 if (activeVideo.requestFullscreen) activeVideo.requestFullscreen();
