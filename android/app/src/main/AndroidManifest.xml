@@ -21,12 +21,13 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
     <!-- System Keep-Alive & Notifications -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.VIBRATE" />
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <!-- Hardware feature requirements (allow installation on devices without physical camera/gps) -->
     <uses-feature android:name="android.hardware.camera" android:required="false" />
@@ -60,7 +61,7 @@
             android:name=".SosForegroundService"
             android:enabled="true"
             android:exported="false"
-            android:foregroundServiceType="location|microphone" />
+            android:foregroundServiceType="location|microphone|dataSync" />
 
     </application>
 

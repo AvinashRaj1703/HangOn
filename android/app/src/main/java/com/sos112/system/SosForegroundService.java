@@ -144,15 +144,32 @@ public class SosForegroundService extends Service implements LocationListener {
             }
         }
 
-        Notification notification = buildNotification();
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(NOTIFICATION_ID, notification,
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION | ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE);
-        } else {
-            startForeground(NOTIFICATION_ID, notification);
+        try {
+            Notification notification = buildNotification();
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                try {
+                    startForeground(NOTIFICATION_ID, notification,
+                            ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION | ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE);
+                } catch (Exception fgsEx) {
+                    Log.w(TAG, "Fallback startForeground without strict types: " + fgsEx.getMessage());
+                    try {
+                        startForeground(NOTIFICATION_ID, notification);
+                    } catch (Exception fallbackEx) {
+                        Log.e(TAG, "Critical startForeground fallback failed", fallbackEx);
+                    }
+                }
+            } else {
+                startForeground(NOTIFICATION_ID, notification);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Notification startForeground failed: " + e.getMessage());
         }
 
-        startSosBroadcasting();
+        try {
+            startSosBroadcasting();
+        } catch (Exception e) {
+            Log.e(TAG, "Error in startSosBroadcasting", e);
+        }
         return START_STICKY;
     }
 

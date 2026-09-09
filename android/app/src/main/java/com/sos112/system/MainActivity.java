@@ -44,6 +44,12 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        // Global uncaught exception protection to prevent app from closing
+        Thread.setDefaultUncaughtExceptionHandler((thread, throwable) -> {
+            Log.e(TAG, "Uncaught exception caught safely: ", throwable);
+        });
+
         setContentView(R.layout.activity_main);
 
         setupWindowStyles();
@@ -56,6 +62,7 @@ public class MainActivity extends AppCompatActivity {
         getWindow().getDecorView().setBackgroundColor(Color.parseColor("#050811"));
         getWindow().setStatusBarColor(Color.parseColor("#050811"));
         getWindow().setNavigationBarColor(Color.parseColor("#050811"));
+        getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
     }
 
     private void setupWebView() {
@@ -64,6 +71,7 @@ public class MainActivity extends AppCompatActivity {
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
         settings.setDatabaseEnabled(true);
+        settings.setGeolocationEnabled(true);
         settings.setMediaPlaybackRequiresUserGesture(false);
         settings.setAllowFileAccess(true);
         settings.setAllowContentAccess(true);
@@ -77,9 +85,17 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onPermissionRequest(final PermissionRequest request) {
                 runOnUiThread(() -> {
-                    // Grant WebRTC camera & microphone permission request to WebView
-                    request.grant(request.getResources());
+                    try {
+                        request.grant(request.getResources());
+                    } catch (Exception e) {
+                        Log.e(TAG, "Error granting web permissions", e);
+                    }
                 });
+            }
+
+            @Override
+            public void onGeolocationPermissionsShowPrompt(String origin, android.webkit.GeolocationPermissions.Callback callback) {
+                callback.invoke(origin, true, false);
             }
         });
 
@@ -141,16 +157,20 @@ public class MainActivity extends AppCompatActivity {
         @JavascriptInterface
         public void startNativeSosService(String serverUrl, String targetId) {
             runOnUiThread(() -> {
-                isSosActive = true;
-                Intent serviceIntent = new Intent(MainActivity.this, SosForegroundService.class);
-                serviceIntent.setAction(SosForegroundService.ACTION_START);
-                serviceIntent.putExtra(SosForegroundService.EXTRA_SERVER_URL, serverUrl);
-                serviceIntent.putExtra(SosForegroundService.EXTRA_TARGET_ID, targetId);
+                try {
+                    isSosActive = true;
+                    Intent serviceIntent = new Intent(MainActivity.this, SosForegroundService.class);
+                    serviceIntent.setAction(SosForegroundService.ACTION_START);
+                    serviceIntent.putExtra(SosForegroundService.EXTRA_SERVER_URL, serverUrl);
+                    serviceIntent.putExtra(SosForegroundService.EXTRA_TARGET_ID, targetId);
 
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    startForegroundService(serviceIntent);
-                } else {
-                    startService(serviceIntent);
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        startForegroundService(serviceIntent);
+                    } else {
+                        startService(serviceIntent);
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Error starting native SOS service", e);
                 }
             });
         }
@@ -158,10 +178,14 @@ public class MainActivity extends AppCompatActivity {
         @JavascriptInterface
         public void stopNativeSosService() {
             runOnUiThread(() -> {
-                isSosActive = false;
-                Intent serviceIntent = new Intent(MainActivity.this, SosForegroundService.class);
-                serviceIntent.setAction(SosForegroundService.ACTION_STOP);
-                startService(serviceIntent);
+                try {
+                    isSosActive = false;
+                    Intent serviceIntent = new Intent(MainActivity.this, SosForegroundService.class);
+                    serviceIntent.setAction(SosForegroundService.ACTION_STOP);
+                    startService(serviceIntent);
+                } catch (Exception e) {
+                    Log.e(TAG, "Error stopping native SOS service", e);
+                }
             });
         }
 
