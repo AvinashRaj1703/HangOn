@@ -836,10 +836,6 @@
                 <span id="alarmIcon">🔔</span>
                 <span id="alarmText">ALARM ON</span>
             </button>
-            <button class="btn-alarm-toggle" id="btnTestAlarm" onclick="testEmergencySiren()" title="Test emergency siren audio output" style="background: rgba(14, 165, 233, 0.18); border-color: rgba(14, 165, 233, 0.4); color: #7dd3fc;">
-                <span>🔊</span>
-                <span>TEST ALARM</span>
-            </button>
             <div class="status-pill">
                 <span class="dot" id="serverDot"></span>
                 <span id="serverStatusText">DISPATCH ONLINE</span>
@@ -938,7 +934,6 @@
         let activeSirenGain = null;
         let audioCtx = null;
         let isSirenActive = false;
-        let testSirenTimeout = null;
 
         function getAudioContext() {
             if (!audioCtx) {
@@ -1115,23 +1110,6 @@
             } catch (e) {
                 console.error("Error playing emergency siren:", e);
             }
-        }
-
-        function testEmergencySiren() {
-            getAudioContext();
-            if (isMasterAlarmMuted) {
-                toggleMasterAlarm(); // Unmute if muted
-            }
-            const btn = document.getElementById('btnTestAlarm');
-            if (btn) btn.innerHTML = '<span>🔊</span><span>TESTING...</span>';
-
-            playEmergencySiren();
-
-            if (testSirenTimeout) clearTimeout(testSirenTimeout);
-            testSirenTimeout = setTimeout(() => {
-                silenceCurrentAlarm();
-                if (btn) btn.innerHTML = '<span>🔊</span><span>TEST ALARM</span>';
-            }, 3500);
         }
 
         // Global Shortcut: Press ESC or M key to instantly silence siren
