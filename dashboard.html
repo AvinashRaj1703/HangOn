@@ -836,6 +836,10 @@
                 <span id="alarmIcon">🔔</span>
                 <span id="alarmText">ALARM ON</span>
             </button>
+            <button class="btn-alarm-toggle" id="btnTestAlarm" onclick="testEmergencySiren()" title="Test emergency siren audio output" style="background: rgba(14, 165, 233, 0.18); border-color: rgba(14, 165, 233, 0.4); color: #7dd3fc;">
+                <span>🔊</span>
+                <span>TEST ALARM</span>
+            </button>
             <div class="status-pill">
                 <span class="dot" id="serverDot"></span>
                 <span id="serverStatusText">DISPATCH ONLINE</span>
@@ -852,15 +856,15 @@
     </header>
 
     <!-- Floating Quick Silence Alert Banner (Shows when emergency alarm sounds) -->
-    <div class="active-alarm-banner" id="activeAlarmBanner" style="display: none;">
+    <div class="active-alarm-banner" id="activeAlarmBanner" style="display: none; cursor: pointer;" onclick="handleAlarmBannerClick(event)">
         <div style="display: flex; align-items: center; gap: 10px;">
             <span style="font-size: 1.4rem; animation: pulse-rapid 0.6s infinite;">🚨</span>
             <div>
                 <strong style="color: #fff; font-size: 0.88rem; letter-spacing: 0.5px;">EMERGENCY ALARM SOUNDING</strong>
-                <div style="font-size: 0.72rem; color: #fee2e2;">112 Emergency SOS incident active. Click or press ESC to silence sound.</div>
+                <div id="alarmBannerSubtext" style="font-size: 0.72rem; color: #fee2e2;">112 Emergency SOS incident active. Click or press ESC to silence sound.</div>
             </div>
         </div>
-        <button class="btn-silence-alarm" onclick="silenceCurrentAlarm()" title="Instantly silence the emergency siren (Shortcut: ESC or M)">
+        <button class="btn-silence-alarm" onclick="silenceCurrentAlarm(event)" title="Instantly silence the emergency siren (Shortcut: ESC or M)">
             🛑 SILENCE ALARM (ESC)
         </button>
     </div>
@@ -930,8 +934,31 @@
         // Master Siren & Alarm Controls
         let isMasterAlarmMuted = localStorage.getItem('112_master_alarm_muted') === 'true';
         let activeSirenOsc = null;
+        let activeSirenLfo = null;
         let activeSirenGain = null;
         let audioCtx = null;
+        let isSirenActive = false;
+        let testSirenTimeout = null;
+
+        function getAudioContext() {
+            if (!audioCtx) {
+                const AudioClass = window.AudioContext || window.webkitAudioContext;
+                if (AudioClass) {
+                    audioCtx = new AudioClass();
+                }
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume().catch(() => {});
+            }
+            return audioCtx;
+        }
+
+        // Global user interaction listener to proactively unlock AudioContext on any browser
+        ['click', 'keydown', 'pointerdown', 'touchstart'].forEach(evt => {
+            window.addEventListener(evt, () => {
+                getAudioContext();
+            }, { passive: true });
+        });
 
         function updateAlarmButtonUI() {
             const btn = document.getElementById('btnMasterAlarm');
@@ -958,69 +985,159 @@
             }
         }
 
-        function silenceCurrentAlarm() {
+        function silenceCurrentAlarm(e) {
+            if (e && e.stopPropagation) e.stopPropagation();
+            isSirenActive = false;
             stopEmergencySiren();
             const banner = document.getElementById('activeAlarmBanner');
             if (banner) banner.style.display = 'none';
         }
 
+        function handleAlarmBannerClick(e) {
+            if (e.target && e.target.closest && e.target.closest('.btn-silence-alarm')) return;
+            const ctx = getAudioContext();
+            if (ctx && ctx.state === 'suspended') {
+                ctx.resume().then(() => {
+                    if (isSirenActive && !isMasterAlarmMuted) {
+                        startSirenOscillators(ctx);
+                        const subtext = document.getElementById('alarmBannerSubtext');
+                        if (subtext) subtext.innerText = '112 Emergency SOS incident active. Click or press ESC to silence sound.';
+                    }
+                }).catch(() => {});
+            }
+        }
+
+        function startSirenOscillators(ctx) {
+            stopEmergencySiren();
+
+            try {
+                // Master Volume Gain node
+                const masterGain = ctx.createGain();
+                masterGain.gain.setValueAtTime(0.01, ctx.currentTime);
+                masterGain.gain.exponentialRampToValueAtTime(0.48, ctx.currentTime + 0.08); // Crisp, high-audibility volume
+
+                // Low-pass filter for smooth yet penetrating sound
+                const filter = ctx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(2600, ctx.currentTime);
+
+                // Main Carrier Oscillator
+                const osc = ctx.createOscillator();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(800, ctx.currentTime);
+
+                // LFO for continuous 112 Hi-Lo alternating siren (980Hz <-> 620Hz)
+                const lfo = ctx.createOscillator();
+                const lfoGain = ctx.createGain();
+                lfo.type = 'square';
+                lfo.frequency.setValueAtTime(1.65, ctx.currentTime); // ~1.65 Hz alternation
+                lfoGain.gain.setValueAtTime(220, ctx.currentTime);
+
+                lfo.connect(lfoGain);
+                lfoGain.connect(osc.frequency);
+
+                osc.connect(filter);
+                filter.connect(masterGain);
+                masterGain.connect(ctx.destination);
+
+                osc.start();
+                lfo.start();
+
+                activeSirenOsc = osc;
+                activeSirenLfo = lfo;
+                activeSirenGain = masterGain;
+            } catch (e) {
+                console.error("Error creating siren oscillators:", e);
+            }
+        }
+
         function stopEmergencySiren() {
             try {
-                if (activeSirenOsc) {
-                    activeSirenOsc.stop();
-                    activeSirenOsc.disconnect();
-                    activeSirenOsc = null;
+                if (activeSirenGain && audioCtx) {
+                    try {
+                        activeSirenGain.gain.cancelScheduledValues(audioCtx.currentTime);
+                        activeSirenGain.gain.setValueAtTime(activeSirenGain.gain.value, audioCtx.currentTime);
+                        activeSirenGain.gain.linearRampToValueAtTime(0.001, audioCtx.currentTime + 0.08);
+                    } catch(e) {}
                 }
-                if (activeSirenGain) {
-                    activeSirenGain.disconnect();
-                    activeSirenGain = null;
-                }
-            } catch (e) { }
+                const oscToStop = activeSirenOsc;
+                const lfoToStop = activeSirenLfo;
+                const gainToDisconnect = activeSirenGain;
+                activeSirenOsc = null;
+                activeSirenLfo = null;
+                activeSirenGain = null;
+
+                setTimeout(() => {
+                    if (oscToStop) {
+                        try { oscToStop.stop(); oscToStop.disconnect(); } catch (e) {}
+                    }
+                    if (lfoToStop) {
+                        try { lfoToStop.stop(); lfoToStop.disconnect(); } catch (e) {}
+                    }
+                    if (gainToDisconnect) {
+                        try { gainToDisconnect.disconnect(); } catch (e) {}
+                    }
+                }, 90);
+            } catch (e) {
+                activeSirenOsc = null;
+                activeSirenLfo = null;
+                activeSirenGain = null;
+            }
         }
 
         function playEmergencySiren() {
             if (isMasterAlarmMuted) return;
 
+            isSirenActive = true;
+
             // Show floating silence alert banner
             const banner = document.getElementById('activeAlarmBanner');
+            const subtext = document.getElementById('alarmBannerSubtext');
             if (banner) banner.style.display = 'flex';
 
             try {
-                const AudioClass = window.AudioContext || window.webkitAudioContext;
-                if (!audioCtx && AudioClass) audioCtx = new AudioClass();
-                if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+                const ctx = getAudioContext();
+                if (!ctx) return;
 
-                if (audioCtx) {
-                    stopEmergencySiren();
-                    const osc = audioCtx.createOscillator();
-                    const gain = audioCtx.createGain();
-                    activeSirenOsc = osc;
-                    activeSirenGain = gain;
-
-                    osc.type = 'sawtooth';
-                    osc.frequency.setValueAtTime(800, audioCtx.currentTime);
-                    osc.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.3);
-                    osc.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 0.6);
-
-                    gain.gain.setValueAtTime(0.18, audioCtx.currentTime);
-                    gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.85);
-
-                    osc.connect(gain);
-                    gain.connect(audioCtx.destination);
-                    osc.start();
-                    osc.stop(audioCtx.currentTime + 0.85);
-
-                    osc.onended = () => {
-                        if (activeSirenOsc === osc) activeSirenOsc = null;
-                    };
+                if (ctx.state === 'suspended') {
+                    if (subtext) subtext.innerHTML = '⚠️ <strong>CLICK HERE TO ENABLE SIREN AUDIO</strong> (Browser autoplay blocked)';
+                    ctx.resume().then(() => {
+                        if (isSirenActive && !isMasterAlarmMuted) {
+                            startSirenOscillators(ctx);
+                            if (subtext) subtext.innerText = '112 Emergency SOS incident active. Click or press ESC to silence sound.';
+                        }
+                    }).catch(() => {});
+                    return;
                 }
-            } catch (e) { }
+
+                if (subtext) subtext.innerText = '112 Emergency SOS incident active. Click or press ESC to silence sound.';
+                startSirenOscillators(ctx);
+            } catch (e) {
+                console.error("Error playing emergency siren:", e);
+            }
+        }
+
+        function testEmergencySiren() {
+            getAudioContext();
+            if (isMasterAlarmMuted) {
+                toggleMasterAlarm(); // Unmute if muted
+            }
+            const btn = document.getElementById('btnTestAlarm');
+            if (btn) btn.innerHTML = '<span>🔊</span><span>TESTING...</span>';
+
+            playEmergencySiren();
+
+            if (testSirenTimeout) clearTimeout(testSirenTimeout);
+            testSirenTimeout = setTimeout(() => {
+                silenceCurrentAlarm();
+                if (btn) btn.innerHTML = '<span>🔊</span><span>TEST ALARM</span>';
+            }, 3500);
         }
 
         // Global Shortcut: Press ESC or M key to instantly silence siren
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' || e.key === 'm' || e.key === 'M') {
-                silenceCurrentAlarm();
+                silenceCurrentAlarm(e);
             }
         });
 
