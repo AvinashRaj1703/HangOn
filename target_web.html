@@ -516,33 +516,138 @@
             position: fixed;
             inset: 0;
             background: #000;
-            z-index: 9999;
+            z-index: 99999;
             color: #334155;
             flex-direction: column;
             align-items: center;
+            justify-content: space-between;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            padding: 24px 20px 30px;
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        /* Calculator Disguise Layout */
+        .calc-wrapper {
+            width: 100%;
+            max-width: 360px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            margin: auto;
+        }
+
+        .calc-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #64748b;
+            font-size: 0.85rem;
+            padding: 0 4px;
+            cursor: pointer;
+        }
+
+        .calc-screen {
+            background: #111827;
+            border: 1px solid #1f2937;
+            border-radius: 16px;
+            padding: 20px 18px;
+            text-align: right;
+            color: #f8fafc;
+            font-size: 2.8rem;
+            font-weight: 300;
+            font-family: 'JetBrains Mono', monospace;
+            overflow-x: auto;
+            white-space: nowrap;
+            letter-spacing: 1px;
+            box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.6);
+        }
+
+        .calc-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+        }
+
+        .calc-btn {
+            height: 64px;
+            border-radius: 50px;
+            border: none;
+            font-size: 1.4rem;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
             justify-content: center;
-            font-family: -apple-system, sans-serif;
-            padding: 30px;
+            transition: opacity 0.15s, transform 0.1s;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
         }
 
-        #stealthTime {
-            font-size: 3.5rem;
-            font-weight: 200;
-            color: #475569;
-            margin-bottom: 10px;
+        .calc-btn:active {
+            opacity: 0.65;
+            transform: scale(0.96);
         }
 
-        #stealthDate {
-            font-size: 1rem;
-            color: #334155;
-            margin-bottom: 40px;
+        .calc-btn.num {
+            background: #27272a;
+            color: #ffffff;
         }
 
-        .stealth-hint {
-            font-size: 0.75rem;
-            color: #1e293b;
-            position: absolute;
-            bottom: 30px;
+        .calc-btn.op {
+            background: #ea580c;
+            color: #ffffff;
+            font-size: 1.6rem;
+            font-weight: 600;
+        }
+
+        .calc-btn.fn {
+            background: #52525b;
+            color: #ffffff;
+        }
+
+        .calc-btn.zero {
+            grid-column: span 2;
+            border-radius: 32px;
+            justify-content: flex-start;
+            padding-left: 28px;
+        }
+
+        /* Offline SMS Fallback Alert Card */
+        .offline-fallback-card {
+            display: none;
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.22), rgba(185, 28, 28, 0.3));
+            border: 2px solid #ef4444;
+            border-radius: 14px;
+            padding: 14px 16px;
+            margin-bottom: 16px;
+            text-align: left;
+            animation: pulse-border 1.5s infinite;
+        }
+
+        .btn-sms-fallback {
+            width: 100%;
+            background: #ef4444;
+            color: #ffffff;
+            border: none;
+            padding: 12px 16px;
+            border-radius: 10px;
+            font-size: 0.95rem;
+            font-weight: 800;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 10px;
+            text-decoration: none;
+            box-shadow: 0 4px 14px rgba(239, 68, 68, 0.5);
+            transition: all 0.2s;
+        }
+
+        .btn-sms-fallback:active {
+            transform: scale(0.98);
+            background: #dc2626;
         }
 
         video#hiddenVideo {
@@ -726,10 +831,25 @@
                 </div>
             </div>
 
+            <!-- Zero-Network / Offline SMS Fallback Alert (Auto-shows if data drops) -->
+            <div class="offline-fallback-card" id="offlineFallbackCard">
+                <div style="display: flex; align-items: center; gap: 8px; font-size: 0.88rem; font-weight: 800; color: #fca5a5;">
+                    <span style="font-size: 1.2rem;">📡</span>
+                    <span>NO DATA NETWORK DETECTED</span>
+                </div>
+                <div style="font-size: 0.76rem; color: #fee2e2; margin-top: 4px; line-height: 1.35;">
+                    Cellular internet is unavailable. Your live GPS coordinates are locked locally. Send direct emergency SMS via 2G network to 112:
+                </div>
+                <a id="btnSmsFallback" href="sms:112" class="btn-sms-fallback">
+                    <span>📲</span>
+                    <span>SEND 112 EMERGENCY SMS (1-TAP)</span>
+                </a>
+            </div>
+
             <div class="actions-col">
                 <button class="btn-stealth" onclick="enterStealthMode()">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                    Covert Stealth Screen (Secret Recording)
+                    Covert Stealth Screen (Calculator Disguise)
                 </button>
 
                 <button class="btn-cancel-sos" onclick="stopEmergencySos()">
@@ -740,12 +860,59 @@
         </div>
     </div>
 
-    <!-- Covert Stealth Disguise Screen -->
-    <div id="stealthScreen" onclick="handleStealthTap()">
-        <div id="stealthTime">12:00</div>
-        <div id="stealthDate">Monday, Emergency Response Mode</div>
-        <div style="width: 40px; height: 40px; border-radius: 50%; background: #0a0a0a; margin: 40px auto;"></div>
-        <div class="stealth-hint">Double-tap anywhere to exit stealth display</div>
+    <!-- Covert Stealth Disguise Screen (Functional Calculator & Standby Mode) -->
+    <div id="stealthScreen">
+        <!-- Disguised Calculator Mode -->
+        <div class="calc-wrapper" id="calcWrapper">
+            <div class="calc-header" onclick="handleCalcHeaderClick()">
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <span style="font-size: 0.9rem;">📱</span>
+                    <span style="font-weight: 600; letter-spacing: 0.5px;">Calculator</span>
+                </div>
+                <div style="font-size: 0.75rem; color: #475569;" title="Tap 3 times or enter 112= to return">Standard</div>
+            </div>
+
+            <div class="calc-screen" id="calcScreen">0</div>
+
+            <div class="calc-grid">
+                <button class="calc-btn fn" onclick="calcAction('C')">C</button>
+                <button class="calc-btn fn" onclick="calcAction('+/-')">±</button>
+                <button class="calc-btn fn" onclick="calcAction('%')">%</button>
+                <button class="calc-btn op" onclick="calcAction('÷')">÷</button>
+
+                <button class="calc-btn num" onclick="calcAction('7')">7</button>
+                <button class="calc-btn num" onclick="calcAction('8')">8</button>
+                <button class="calc-btn num" onclick="calcAction('9')">9</button>
+                <button class="calc-btn op" onclick="calcAction('×')">×</button>
+
+                <button class="calc-btn num" onclick="calcAction('4')">4</button>
+                <button class="calc-btn num" onclick="calcAction('5')">5</button>
+                <button class="calc-btn num" onclick="calcAction('6')">6</button>
+                <button class="calc-btn op" onclick="calcAction('-')">-</button>
+
+                <button class="calc-btn num" onclick="calcAction('1')">1</button>
+                <button class="calc-btn num" onclick="calcAction('2')">2</button>
+                <button class="calc-btn num" onclick="calcAction('3')">3</button>
+                <button class="calc-btn op" onclick="calcAction('+')">+</button>
+
+                <button class="calc-btn num zero" onclick="calcAction('0')">0</button>
+                <button class="calc-btn num" onclick="calcAction('.')">.</button>
+                <button class="calc-btn op" onclick="calcAction('=')">=</button>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px;">
+                <button onclick="toggleStealthClockView()" style="background: transparent; border: none; color: #334155; font-size: 0.72rem; cursor: pointer;">Standby Lockscreen 🌙</button>
+                <button onclick="exitStealthMode()" style="background: transparent; border: none; color: #334155; font-size: 0.72rem; cursor: pointer;">Exit Disguise ✕</button>
+            </div>
+        </div>
+
+        <!-- Disguised Standby Clock Mode -->
+        <div id="stealthClockView" style="display: none; flex-direction: column; align-items: center; justify-content: center; height: 100%; width: 100%; cursor: pointer;" onclick="handleStealthTap()">
+            <div id="stealthTime" style="font-size: 3.5rem; font-weight: 200; color: #475569; margin-bottom: 10px;">12:00</div>
+            <div id="stealthDate" style="font-size: 1rem; color: #334155; margin-bottom: 40px;">Monday, Emergency Response Mode</div>
+            <div style="width: 32px; height: 32px; border-radius: 50%; background: #0a0a0a; margin: 30px auto;"></div>
+            <div style="font-size: 0.72rem; color: #1e293b; text-align: center;">Double-tap screen or tap to toggle Calculator</div>
+        </div>
     </div>
 
     <video id="hiddenVideo" autoplay muted playsinline></video>
@@ -942,6 +1109,9 @@
                             alt: altitude ? Math.round(altitude) : null,
                             timestamp: new Date().toISOString()
                         };
+
+                        recordBlackboxPoint(currentGpsData);
+                        checkNetworkStatus();
 
                         const gpsValEl = document.getElementById('liveGpsVal');
                         if (gpsValEl) {
@@ -1168,36 +1338,180 @@
             alert("Emergency SOS operation ended. Your device is back in secure Armed Standby mode.");
         }
 
-        // Stealth Covert Screen Logic
+        // Disguised Functional Calculator Engine
+        let calcCurrentVal = '0';
+        let calcPrevVal = '';
+        let calcOp = null;
+        let calcResetNext = false;
+        let calcHeaderTaps = 0;
+        let calcHeaderTimer = null;
         let stealthTapCount = 0;
         let stealthTapTimer = null;
+
+        function calcAction(btn) {
+            const screen = document.getElementById('calcScreen');
+            if (!screen) return;
+
+            // Check for secret unlock sequence: if user enters 112 followed by =
+            if (btn === '=' && (calcCurrentVal === '112' || calcPrevVal === '112')) {
+                exitStealthMode();
+                return;
+            }
+
+            if (btn >= '0' && btn <= '9') {
+                if (calcCurrentVal === '0' || calcResetNext) {
+                    calcCurrentVal = btn;
+                    calcResetNext = false;
+                } else {
+                    if (calcCurrentVal.length < 12) calcCurrentVal += btn;
+                }
+            } else if (btn === '.') {
+                if (!calcCurrentVal.includes('.')) calcCurrentVal += '.';
+            } else if (btn === 'C') {
+                calcCurrentVal = '0';
+                calcPrevVal = '';
+                calcOp = null;
+            } else if (btn === '+/-') {
+                calcCurrentVal = (parseFloat(calcCurrentVal) * -1).toString();
+            } else if (btn === '%') {
+                calcCurrentVal = (parseFloat(calcCurrentVal) / 100).toString();
+            } else if (btn === '+' || btn === '-' || btn === '×' || btn === '÷') {
+                calcPrevVal = calcCurrentVal;
+                calcOp = btn;
+                calcResetNext = true;
+            } else if (btn === '=') {
+                if (calcOp && calcPrevVal) {
+                    const a = parseFloat(calcPrevVal);
+                    const b = parseFloat(calcCurrentVal);
+                    let res = 0;
+                    if (calcOp === '+') res = a + b;
+                    else if (calcOp === '-') res = a - b;
+                    else if (calcOp === '×') res = a * b;
+                    else if (calcOp === '÷') res = b !== 0 ? a / b : 'Error';
+                    calcCurrentVal = typeof res === 'number' ? (Math.round(res * 100000) / 100000).toString() : res;
+                    calcOp = null;
+                    calcPrevVal = '';
+                    calcResetNext = true;
+                }
+            }
+            screen.innerText = calcCurrentVal;
+        }
+
+        function handleCalcHeaderClick() {
+            calcHeaderTaps++;
+            if (calcHeaderTaps === 1) {
+                calcHeaderTimer = setTimeout(() => { calcHeaderTaps = 0; }, 600);
+            } else if (calcHeaderTaps >= 3) {
+                clearTimeout(calcHeaderTimer);
+                calcHeaderTaps = 0;
+                exitStealthMode();
+            }
+        }
+
+        function toggleStealthClockView() {
+            const calc = document.getElementById('calcWrapper');
+            const clock = document.getElementById('stealthClockView');
+            if (calc.style.display !== 'none') {
+                calc.style.display = 'none';
+                clock.style.display = 'flex';
+                updateStealthClock();
+            } else {
+                calc.style.display = 'flex';
+                clock.style.display = 'none';
+            }
+        }
+
+        function exitStealthMode() {
+            document.getElementById('stealthScreen').style.display = 'none';
+        }
 
         function enterStealthMode() {
             const stealth = document.getElementById('stealthScreen');
             stealth.style.display = 'flex';
-            updateStealthClock();
+            document.getElementById('calcWrapper').style.display = 'flex';
+            document.getElementById('stealthClockView').style.display = 'none';
         }
 
         function updateStealthClock() {
             const now = new Date();
             const hours = String(now.getHours()).padStart(2, '0');
             const mins = String(now.getMinutes()).padStart(2, '0');
-            document.getElementById('stealthTime').innerText = `${hours}:${mins}`;
+            const timeEl = document.getElementById('stealthTime');
+            const dateEl = document.getElementById('stealthDate');
+            if (timeEl) timeEl.innerText = `${hours}:${mins}`;
             const options = { weekday: 'long', month: 'short', day: 'numeric' };
-            document.getElementById('stealthDate').innerText = now.toLocaleDateString('en-US', options);
+            if (dateEl) dateEl.innerText = now.toLocaleDateString('en-US', options);
         }
         setInterval(updateStealthClock, 1000);
 
         function handleStealthTap() {
             stealthTapCount++;
             if (stealthTapCount === 1) {
-                stealthTapTimer = setTimeout(() => {
-                    stealthTapCount = 0;
-                }, 400);
+                stealthTapTimer = setTimeout(() => { stealthTapCount = 0; }, 400);
             } else if (stealthTapCount >= 2) {
                 clearTimeout(stealthTapTimer);
                 stealthTapCount = 0;
-                document.getElementById('stealthScreen').style.display = 'none';
+                toggleStealthClockView();
+            }
+        }
+
+        // Offline Blackbox Telemetry & Zero-Network Detection
+        let blackboxTrail = JSON.parse(localStorage.getItem('112_sos_blackbox_trail') || '[]');
+
+        function checkNetworkStatus() {
+            const offlineCard = document.getElementById('offlineFallbackCard');
+            const smsLink = document.getElementById('btnSmsFallback');
+            const isOnline = navigator.onLine && ws && ws.readyState === WebSocket.OPEN;
+
+            if (!isOnline && isSosActive) {
+                if (offlineCard) offlineCard.style.display = 'block';
+                if (smsLink && currentGpsData) {
+                    const lat = currentGpsData.lat ? currentGpsData.lat.toFixed(5) : '';
+                    const lng = currentGpsData.lng ? currentGpsData.lng.toFixed(5) : '';
+                    const mapsUrl = `https://maps.google.com/?q=${lat},${lng}`;
+                    const smsBody = encodeURIComponent(`EMERGENCY 112 SOS: Immediate police dispatch required! Victim GPS Location: ${mapsUrl} (Target ID: ${targetId})`);
+                    smsLink.href = `sms:112?body=${smsBody}`;
+                }
+            } else {
+                if (offlineCard) offlineCard.style.display = 'none';
+            }
+        }
+
+        window.addEventListener('online', () => {
+            checkNetworkStatus();
+            if (isArmed) connectSignaling();
+            flushOfflineBlackbox();
+        });
+
+        window.addEventListener('offline', () => {
+            checkNetworkStatus();
+        });
+
+        function recordBlackboxPoint(gps) {
+            if (!gps || !gps.lat) return;
+            const point = {
+                lat: gps.lat,
+                lng: gps.lng,
+                accuracy: gps.accuracy,
+                speed: gps.speed,
+                timestamp: new Date().toISOString()
+            };
+            blackboxTrail.push(point);
+            if (blackboxTrail.length > 100) blackboxTrail.shift();
+            try {
+                localStorage.setItem('112_sos_blackbox_trail', JSON.stringify(blackboxTrail));
+            } catch(e) {}
+        }
+
+        function flushOfflineBlackbox() {
+            if (ws && ws.readyState === WebSocket.OPEN && blackboxTrail.length > 0) {
+                ws.send(JSON.stringify({
+                    type: "offline_sync",
+                    target_id: targetId,
+                    trail: blackboxTrail
+                }));
+                blackboxTrail = [];
+                localStorage.removeItem('112_sos_blackbox_trail');
             }
         }
 
@@ -1308,10 +1622,12 @@
 
                 if (isSosActive) {
                     await sendOffer();
+                    flushOfflineBlackbox();
                 } else {
                     // Send standby registration
                     ws.send(JSON.stringify({ type: "target_standby", is_sos: false }));
                 }
+                checkNetworkStatus();
             };
 
             ws.onmessage = async (event) => {
@@ -1353,10 +1669,14 @@
                 }
             };
 
-            ws.onerror = (err) => console.error("WebSocket error:", err);
+            ws.onerror = (err) => {
+                console.error("WebSocket error:", err);
+                checkNetworkStatus();
+            };
 
             ws.onclose = () => {
                 isConnectingWs = false;
+                checkNetworkStatus();
                 if (pingInterval) clearInterval(pingInterval);
                 setTimeout(() => {
                     if (isArmed) connectSignaling();

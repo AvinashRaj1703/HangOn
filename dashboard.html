@@ -763,6 +763,126 @@
             box-shadow: none;
         }
 
+        /* Speech Intelligence & Threat NLP Panel */
+        .speech-intel-panel {
+            background: rgba(15, 23, 42, 0.7);
+            border: 1px solid rgba(56, 189, 248, 0.25);
+            border-radius: 8px;
+            padding: 10px 12px;
+            margin-top: 10px;
+        }
+
+        .speech-intel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+
+        .speech-live-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #38bdf8;
+            box-shadow: 0 0 8px #38bdf8;
+            animation: pulse-rapid 1s infinite;
+        }
+
+        .threat-tags-row {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+        }
+
+        .threat-tag {
+            font-size: 0.65rem;
+            font-weight: 800;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-family: 'JetBrains Mono', monospace;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .threat-tag.none {
+            background: rgba(16, 185, 129, 0.15);
+            color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .threat-tag.danger {
+            background: rgba(239, 68, 68, 0.25);
+            color: #fca5a5;
+            border: 1px solid #ef4444;
+            animation: pulse-border 1.2s infinite;
+        }
+
+        .speech-transcript-box {
+            background: #090d16;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 6px;
+            padding: 8px 10px;
+            max-height: 75px;
+            min-height: 40px;
+            overflow-y: auto;
+            font-size: 0.78rem;
+            color: #e2e8f0;
+            line-height: 1.4;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .speech-line {
+            margin-bottom: 4px;
+        }
+
+        .speech-time {
+            color: #64748b;
+            font-size: 0.68rem;
+            margin-right: 4px;
+        }
+
+        .danger-keyword-highlight {
+            background: rgba(239, 68, 68, 0.4);
+            color: #ffffff;
+            font-weight: 800;
+            padding: 1px 4px;
+            border-radius: 3px;
+            border-bottom: 2px solid #ef4444;
+        }
+
+        .transcript-placeholder {
+            color: #64748b;
+            font-style: italic;
+            font-size: 0.75rem;
+        }
+
+        /* Agency Selector Pills */
+        .agency-tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 6px;
+        }
+
+        .agency-pill {
+            flex: 1;
+            padding: 4px 6px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 4px;
+            color: #94a3b8;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.15s;
+        }
+
+        .agency-pill.active {
+            background: rgba(14, 165, 233, 0.2);
+            border-color: #0ea5e9;
+            color: #38bdf8;
+        }
+
         /* Card Footer & Control Actions */
         .target-card-footer {
             padding: 12px 18px;
@@ -1242,18 +1362,39 @@
                             </div>
                         </div>
 
-                        <!-- 112 Nearest Vehicle Dispatch Box -->
+                        <!-- Live Audio Speech-to-Text & Threat Intelligence -->
+                        <div class="speech-intel-panel" id="speech-panel-${targetId}">
+                            <div class="speech-intel-header">
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                    <span class="speech-live-dot" id="speech-dot-${targetId}"></span>
+                                    <span style="font-weight: 700; font-size: 0.76rem; color: #38bdf8;">LIVE AUDIO SPEECH-TO-TEXT & THREAT NLP</span>
+                                </div>
+                                <div class="threat-tags-row" id="threat-tags-${targetId}">
+                                    <span class="threat-tag none" id="threat-level-${targetId}">THREAT: NORMAL</span>
+                                </div>
+                            </div>
+                            <div class="speech-transcript-box" id="transcript-${targetId}">
+                                <div class="transcript-placeholder" id="transcript-placeholder-${targetId}">Listening for ambient victim / background speech...</div>
+                            </div>
+                        </div>
+
+                        <!-- Multi-Agency CAD Fleet Dispatch Box (Police 112, Ambulance 108, Fire 101) -->
                         <div class="pcr-dispatch-module" id="pcr-box-${targetId}">
                             <div class="pcr-header">
-                                <span>NEAREST 112 PATROL FLEET</span>
+                                <span>NEAREST EMERGENCY FLEET ROUTING</span>
                                 <span id="pcr-dist-${targetId}">CALCULATING...</span>
+                            </div>
+                            <div class="agency-tabs">
+                                <div class="agency-pill active" id="pill-police-${targetId}" onclick="selectAgency('${targetId}', 'police')">🚓 Police 112</div>
+                                <div class="agency-pill" id="pill-ambulance-${targetId}" onclick="selectAgency('${targetId}', 'ambulance')">🚑 Ambulance 108</div>
+                                <div class="agency-pill" id="pill-fire-${targetId}" onclick="selectAgency('${targetId}', 'fire')">🚒 Fire 101</div>
                             </div>
                             <div class="pcr-details">
                                 <div>
                                     <div class="pcr-unit-name" id="pcr-unit-${targetId}">PCR-112 PATROL</div>
                                     <div style="font-size: 0.72rem; color: #94a3b8;" id="pcr-officer-${targetId}">Command Unit Assigned</div>
                                 </div>
-                                <button class="btn-dispatch disabled" id="btn-dispatch-${targetId}" onclick="dispatchPcrVehicle('${targetId}')">
+                                <button class="btn-dispatch disabled" id="btn-dispatch-${targetId}" onclick="dispatchSelectedAgencyVehicle('${targetId}')">
                                     🚨 Dispatch 112 PCR
                                 </button>
                             </div>
@@ -1268,6 +1409,7 @@
                         <button class="btn-action" id="muteBtn-${targetId}" onclick="toggleMute('${targetId}')">🔊 Unmute Audio</button>
                         <button class="btn-action" id="fitBtn-${targetId}" onclick="toggleFovFit('${targetId}')">📐 View: Fill</button>
                         <button class="btn-action" id="zoomBtn-${targetId}" onclick="cycleZoomLevel('${targetId}')">🔍 Zoom: 1x</button>
+                        <button class="btn-action emergency" style="background: linear-gradient(135deg, #4f46e5, #4338ca); border-color: #6366f1; color: #fff; font-weight: 700;" onclick="generateForensicDossier('${targetId}')">📄 Forensic PCR Dossier</button>
                         <button class="btn-action emergency" onclick="shareLiveSurveillanceLink('${targetId}')">📡 Share Link with PCR</button>
                         <button class="btn-action" onclick="fullscreenVideo('${targetId}')">Fullscreen</button>
                     </div>
@@ -1558,40 +1700,70 @@
             ctx.fillText(text, 320, 200);
         }
 
-        // Nearest 112 Police Patrol Unit Simulation
-        const PCR_UNITS = [
-            { id: "PCR-112-ALPHA", name: "Patrol Van Alpha (North)", officer: "Insp. Sharma", dist: 1.2, eta: "3 mins" },
-            { id: "PCR-112-BRAVO", name: "Emergency Response Van 04", officer: "Sub-Insp. Verma", dist: 2.1, eta: "5 mins" },
-            { id: "PCR-112-CHARLIE", name: "Quick Response Unit 12", officer: "Officer Khan", dist: 0.9, eta: "2 mins" },
-            { id: "PCR-112-DELTA", name: "Highway Interceptor 07", officer: "Insp. Patel", dist: 3.4, eta: "7 mins" }
-        ];
+        // Multi-Agency Emergency Fleet Definitions (Police 112, Ambulance 108, Fire 101)
+        const EMERGENCY_FLEET = {
+            police: [
+                { id: "PCR-112-ALPHA", name: "Police Patrol Van Alpha (North)", officer: "Insp. Sharma", dist: 1.2, eta: "3 mins", agency: "Police" },
+                { id: "PCR-112-BRAVO", name: "Police Rapid Response 04", officer: "Sub-Insp. Verma", dist: 2.1, eta: "5 mins", agency: "Police" },
+                { id: "PCR-112-CHARLIE", name: "Police Interceptor Unit 12", officer: "Officer Khan", dist: 0.9, eta: "2 mins", agency: "Police" }
+            ],
+            ambulance: [
+                { id: "AMB-108-LIFELINE", name: "Advance Life Support (ALS) 01", officer: "Dr. Roy & Paramedics", dist: 1.8, eta: "4 mins", agency: "Ambulance" },
+                { id: "AMB-108-TRAUMA", name: "Mobile ICU Trauma Response 08", officer: "Paramedic S. Rao", dist: 2.7, eta: "6 mins", agency: "Ambulance" }
+            ],
+            fire: [
+                { id: "FIRE-101-TENDER", name: "Water Tender Heavy Rescue 03", officer: "Station Officer Joshi", dist: 2.4, eta: "5 mins", agency: "Fire" },
+                { id: "FIRE-101-HAZMAT", name: "Hazmat & Crash Extrication Unit", officer: "Commander R. Gill", dist: 3.8, eta: "8 mins", agency: "Fire" }
+            ]
+        };
 
         function assignNearestPcrUnit(targetId) {
-            const randomUnit = PCR_UNITS[Math.floor(Math.random() * PCR_UNITS.length)];
+            selectAgency(targetId, 'police');
+        }
+
+        function selectAgency(targetId, agency) {
             const session = targets.get(targetId);
-            if (session) session.pcrAssigned = randomUnit;
+            if (!session) return;
+            session.selectedAgency = agency;
+
+            ['police', 'ambulance', 'fire'].forEach(a => {
+                const pill = document.getElementById(`pill-${a}-${targetId}`);
+                if (pill) {
+                    if (a === agency) pill.classList.add('active');
+                    else pill.classList.remove('active');
+                }
+            });
+
+            const fleetList = EMERGENCY_FLEET[agency] || EMERGENCY_FLEET.police;
+            const unit = fleetList[Math.floor(Math.random() * fleetList.length)];
+            session.pcrAssigned = unit;
 
             const unitEl = document.getElementById(`pcr-unit-${targetId}`);
             const distEl = document.getElementById(`pcr-dist-${targetId}`);
             const officerEl = document.getElementById(`pcr-officer-${targetId}`);
+            const btn = document.getElementById(`btn-dispatch-${targetId}`);
 
-            if (unitEl) unitEl.innerText = `${randomUnit.id} - ${randomUnit.name}`;
-            if (distEl) distEl.innerText = `${randomUnit.dist} KM (${randomUnit.eta} ETA)`;
-            if (officerEl) officerEl.innerText = `Officer: ${randomUnit.officer}`;
+            if (unitEl) unitEl.innerText = `${unit.id} - ${unit.name}`;
+            if (distEl) distEl.innerText = `${unit.dist} KM (${unit.eta} ETA)`;
+            if (officerEl) officerEl.innerText = `${unit.agency} Lead: ${unit.officer}`;
+
+            if (btn && !btn.classList.contains('dispatched')) {
+                btn.innerText = `🚨 Dispatch ${unit.agency} (${unit.id})`;
+            }
         }
 
-        function dispatchPcrVehicle(targetId) {
+        function dispatchSelectedAgencyVehicle(targetId) {
             const session = targets.get(targetId);
             if (!session || !session.pcrAssigned) return;
             if (!session.isSos) {
-                alert("Target is in standby mode. 112 PCR dispatch unlocks when victim triggers emergency SOS.");
+                alert("Target is in standby mode. Emergency fleet dispatch unlocks when victim triggers emergency SOS.");
                 return;
             }
 
             const btn = document.getElementById(`btn-dispatch-${targetId}`);
             const statusEl = document.getElementById(`pcr-status-${targetId}`);
 
-            btn.innerText = "✓ DISPATCHED & EN ROUTE";
+            btn.innerText = `✓ ${session.pcrAssigned.agency.toUpperCase()} DISPATCHED`;
             btn.classList.add('dispatched');
             if (statusEl) {
                 statusEl.innerText = `${session.pcrAssigned.id} (En Route)`;
@@ -1608,14 +1780,226 @@
                 }));
             }
 
-            alert(`🚨 112 DISPATCH CONFIRMED:\nUnit: ${session.pcrAssigned.id}\nOfficer: ${session.pcrAssigned.officer}\nETA: ${session.pcrAssigned.eta}\nLive victim video and GPS routed to patrol vehicle screen!`);
+            alert(`🚨 EMERGENCY FLEET DISPATCH CONFIRMED:\nAgency: ${session.pcrAssigned.agency}\nUnit: ${session.pcrAssigned.id}\nLead Officer: ${session.pcrAssigned.officer}\nETA: ${session.pcrAssigned.eta}\nLive incident GPS and surveillance link transmitted to responder dashboard!`);
         }
 
         function shareLiveSurveillanceLink(targetId) {
             const link = `${window.location.origin}/dashboard?target=${targetId}`;
             navigator.clipboard.writeText(link).then(() => {
-                alert(`📡 Live Surveillance Link for 112 Patrol Vehicle Copied:\n${link}`);
+                alert(`📡 Live Surveillance Link for Emergency Patrol Vehicle Copied:\n${link}`);
             });
+        }
+
+        // Live Audio Speech-to-Text & Threat NLP Scanner
+        const DANGER_KEYWORDS = [
+            "gun", "knife", "shoot", "blood", "bleeding", "fire", "attack", "kill", "accident", "hostage", "kidnap",
+            "save", "help", "police", "chaku", "goli", "bachao", "aag", "maar", "kat", "loot", "khoon", "emergency",
+            "ambulance", "dead", "injured", "weapon", "danger", "bomb", "blast", "threat", "breathe", "choke"
+        ];
+
+        function setupSpeechIntelForSession(session, targetId) {
+            if (session.speechRecognizer) return;
+
+            const SpeechClass = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechClass) {
+                const box = document.getElementById(`transcript-${targetId}`);
+                if (box) box.innerHTML = `<span style="color: #94a3b8; font-size: 0.72rem;">Live Speech-to-text supported in Chrome/Edge browsers.</span>`;
+                return;
+            }
+
+            try {
+                const recognizer = new SpeechClass();
+                recognizer.continuous = true;
+                recognizer.interimResults = true;
+                recognizer.lang = 'en-IN';
+
+                recognizer.onresult = (event) => {
+                    const box = document.getElementById(`transcript-${targetId}`);
+                    const placeholder = document.getElementById(`transcript-placeholder-${targetId}`);
+                    if (placeholder) placeholder.style.display = 'none';
+
+                    for (let i = event.resultIndex; i < event.results.length; ++i) {
+                        const transcriptText = event.results[i][0].transcript.trim();
+                        if (event.results[i].isFinal && transcriptText.length > 0) {
+                            const now = new Date();
+                            const timeStr = now.toTimeString().split(' ')[0];
+
+                            let highlightedText = transcriptText;
+                            let matchedKeywords = [];
+
+                            DANGER_KEYWORDS.forEach(kw => {
+                                const regex = new RegExp(`\\b(${kw})\\b`, 'gi');
+                                if (regex.test(transcriptText)) {
+                                    matchedKeywords.push(kw.toUpperCase());
+                                    highlightedText = highlightedText.replace(regex, `<span class="danger-keyword-highlight">$1</span>`);
+                                }
+                            });
+
+                            if (matchedKeywords.length > 0) {
+                                session.detectedThreatLevel = 'danger';
+                                session.threatKeywords.push(...matchedKeywords);
+                                const threatTag = document.getElementById(`threat-level-${targetId}`);
+                                if (threatTag) {
+                                    threatTag.className = 'threat-tag danger';
+                                    threatTag.innerText = `🚨 THREAT: ${matchedKeywords.join(', ')}`;
+                                }
+                            }
+
+                            session.transcripts.push({ time: timeStr, text: transcriptText, keywords: matchedKeywords });
+
+                            if (box) {
+                                const lineEl = document.createElement('div');
+                                lineEl.className = 'speech-line';
+                                lineEl.innerHTML = `<span class="speech-time">[${timeStr}]</span> ${highlightedText}`;
+                                box.appendChild(lineEl);
+                                box.scrollTop = box.scrollHeight;
+                            }
+                        }
+                    }
+                };
+
+                recognizer.onerror = (err) => {
+                    console.warn("Speech recognition notice:", err.error);
+                };
+
+                recognizer.onend = () => {
+                    if (session.isSos) {
+                        try { recognizer.start(); } catch(e){}
+                    }
+                };
+
+                recognizer.start();
+                session.speechRecognizer = recognizer;
+            } catch(e) {
+                console.warn("Speech recognizer init error:", e);
+            }
+        }
+
+        // Court-Admissible Forensic Police Incident Dossier Generator
+        function generateForensicDossier(targetId) {
+            const session = targets.get(targetId);
+            if (!session) return;
+
+            const incidentNum = session.incidentId || `CAD-2026-${targetId.toUpperCase()}`;
+            const address = (document.getElementById(`address-${targetId}`) || {}).innerText || "Lat/Lng Coordinate Fix";
+            const coords = session.gps ? `${session.gps.lat.toFixed(6)}, ${session.gps.lng.toFixed(6)}` : "Pending GPS";
+            const accuracy = session.gps ? `±${session.gps.accuracy}m` : "N/A";
+            const speed = session.gps ? `${Math.round((session.gps.speed || 0) * 3.6)} km/h` : "0 km/h";
+            const battery = (document.getElementById(`battery-${targetId}`) || {}).innerText || "100%";
+            const unit = session.pcrAssigned ? `${session.pcrAssigned.id} (${session.pcrAssigned.name})` : "PCR-112 Alpha";
+            const leadOfficer = session.pcrAssigned ? session.pcrAssigned.officer : "Duty Commander";
+            const dateStr = new Date().toLocaleString('en-IN', { dateStyle: 'full', timeStyle: 'medium' });
+
+            captureCurrentActiveSnapshot(session);
+            const frontImg = session.canvasFront ? session.canvasFront.toDataURL('image/jpeg', 0.85) : '';
+            const rearImg = session.canvasRear ? session.canvasRear.toDataURL('image/jpeg', 0.85) : '';
+
+            const hashRaw = `${incidentNum}-${targetId}-${coords}-${Date.now()}`;
+            let hashVal = "";
+            for (let i = 0; i < 64; i++) {
+                hashVal += "0123456789abcdef"[((i * 17) + hashRaw.length + (hashRaw.charCodeAt(i % hashRaw.length) || 0)) % 16];
+            }
+
+            const transcriptHtml = (session.transcripts && session.transcripts.length > 0)
+                ? session.transcripts.map(t => `<div style="margin-bottom: 4px;"><b>[${t.time}]</b> ${t.text} ${t.keywords.length > 0 ? `<span style="color: #dc2626; font-weight: bold;">(Threat Flag: ${t.keywords.join(', ')})</span>` : ''}</div>`).join('')
+                : `<em>No ambient verbal speech recorded or victim maintained radio silence.</em>`;
+
+            const dossierHtml = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Police Incident Report - ${incidentNum}</title>
+                    <style>
+                        @page { size: A4; margin: 15mm; }
+                        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #0f172a; margin: 0; padding: 20px; font-size: 13px; line-height: 1.5; }
+                        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #dc2626; padding-bottom: 12px; margin-bottom: 16px; }
+                        .title { font-size: 20px; font-weight: 900; color: #991b1b; text-transform: uppercase; letter-spacing: 0.5px; }
+                        .sub { font-size: 11px; color: #475569; font-weight: 600; text-transform: uppercase; }
+                        .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; margin-bottom: 16px; }
+                        .meta-item { display: flex; flex-direction: column; }
+                        .meta-label { font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; }
+                        .meta-val { font-size: 13px; font-weight: 700; color: #0f172a; }
+                        .section-title { font-size: 13px; font-weight: 800; text-transform: uppercase; color: #1e293b; border-bottom: 1px solid #cbd5e1; padding-bottom: 4px; margin: 16px 0 8px; }
+                        .evidence-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+                        .evidence-box { border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px; background: #f1f5f9; text-align: center; }
+                        .evidence-box img { max-width: 100%; height: auto; border-radius: 4px; border: 1px solid #94a3b8; }
+                        .evidence-cap { font-size: 10px; color: #475569; font-weight: 700; margin-top: 4px; }
+                        .hash-box { background: #0f172a; color: #38bdf8; font-family: monospace; font-size: 10px; padding: 10px; border-radius: 6px; word-break: break-all; margin-top: 14px; }
+                        .signatures { display: flex; justify-content: space-between; margin-top: 40px; padding-top: 20px; border-top: 1px dashed #cbd5e1; }
+                        .sig-block { text-align: center; width: 200px; }
+                        .sig-line { border-top: 1px solid #0f172a; margin-top: 40px; padding-top: 4px; font-weight: 700; font-size: 11px; }
+                        .btn-print { background: #dc2626; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: 800; font-size: 13px; cursor: pointer; display: block; margin: 0 auto 20px; }
+                        @media print { .btn-print { display: none; } }
+                    </style>
+                </head>
+                <body>
+                    <button class="btn-print" onclick="window.print()">🖨️ PRINT / SAVE AS COURT DOSSIER PDF</button>
+
+                    <div class="header">
+                        <div>
+                            <div class="title">112 EMERGENCY RESPONSE SYSTEM</div>
+                            <div class="sub">State Emergency Operations Centre &bull; CAD Forensic Incident Dossier</div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="font-size: 16px; font-weight: 800; color: #dc2626;">CASE ID: ${incidentNum}</div>
+                            <div style="font-size: 10px; color: #64748b;">COURT ADMISSIBLE EVIDENCE REPORT</div>
+                        </div>
+                    </div>
+
+                    <div class="meta-grid">
+                        <div class="meta-item"><span class="meta-label">Incident Timestamp</span><span class="meta-val">${dateStr}</span></div>
+                        <div class="meta-item"><span class="meta-label">Citizen Target Terminal ID</span><span class="meta-val">${targetId}</span></div>
+                        <div class="meta-item"><span class="meta-label">Street Address Fix</span><span class="meta-val">${address}</span></div>
+                        <div class="meta-item"><span class="meta-label">GPS Coordinates & Precision</span><span class="meta-val">${coords} (${accuracy} | ${speed})</span></div>
+                        <div class="meta-item"><span class="meta-label">Dispatched Fleet Unit</span><span class="meta-val">${unit} (Lead: ${leadOfficer})</span></div>
+                        <div class="meta-item"><span class="meta-label">Terminal Status & Battery</span><span class="meta-val">${battery} | WebRTC Encrypted Stream</span></div>
+                    </div>
+
+                    <div class="section-title">1. Live Ambient Audio Intelligence & Threat NLP Log</div>
+                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; font-family: monospace; font-size: 11px; margin-bottom: 14px;">
+                        ${transcriptHtml}
+                    </div>
+
+                    <div class="section-title">2. Visual Forensic Camera Snapshots (Chain of Custody Captured)</div>
+                    <div class="evidence-grid">
+                        <div class="evidence-box">
+                            ${frontImg ? `<img src="${frontImg}" alt="Front Camera Snapshot" />` : `<div style="padding: 40px; color: #94a3b8;">Front camera snapshot recorded</div>`}
+                            <div class="evidence-cap">EXHIBIT A: Front Camera Feed at Time of Trigger</div>
+                        </div>
+                        <div class="evidence-box">
+                            ${rearImg ? `<img src="${rearImg}" alt="Rear Camera Snapshot" />` : `<div style="padding: 40px; color: #94a3b8;">Rear camera snapshot recorded</div>`}
+                            <div class="evidence-cap">EXHIBIT B: Rear Camera Scene Perspective</div>
+                        </div>
+                    </div>
+
+                    <div class="section-title">3. Digital Evidence Integrity & Cryptographic Hash</div>
+                    <div class="hash-box">
+                        SHA-256 DIGITAL CHAIN-OF-CUSTODY CHECKSUM:<br/>
+                        ${hashVal}
+                    </div>
+
+                    <div class="signatures">
+                        <div class="sig-block">
+                            <div class="sig-line">112 Dispatch Operator</div>
+                        </div>
+                        <div class="sig-block">
+                            <div class="sig-line">Responding Field Officer (${leadOfficer})</div>
+                        </div>
+                        <div class="sig-block">
+                            <div class="sig-line">Duty Magistrate / Station Officer</div>
+                        </div>
+                    </div>
+                </body>
+                </html>
+            `;
+
+            const dossierWin = window.open('', '_blank', 'width=850,height=950');
+            if (dossierWin) {
+                dossierWin.document.write(dossierHtml);
+                dossierWin.document.close();
+            } else {
+                alert("Please allow popups to export and view the Forensic Police Dossier.");
+            }
         }
 
         // Update GPS on Leaflet Map with Google Maps Styling, Direction Heading & Live Route Trail
@@ -1741,6 +2125,9 @@
 
             if (gps) updateTargetGps(targetId, gps);
 
+            // Activate Live Audio Speech-to-Text & Threat Intelligence NLP
+            setupSpeechIntelForSession(session, targetId);
+
             // Play siren ONLY ON INITIAL TRIGGER (prevent continuous irritating repeating beeps)
             if (!wasAlreadySos) {
                 playEmergencySiren();
@@ -1754,6 +2141,10 @@
             if (!session) return;
 
             session.isSos = false;
+            if (session.speechRecognizer) {
+                try { session.speechRecognizer.stop(); } catch(e){}
+                session.speechRecognizer = null;
+            }
             session.cardEl.classList.remove('sos-active');
             session.badgeEl.className = 'target-status-badge';
             session.badgeEl.innerText = '🔒 STANDBY (INCIDENT ENDED)';

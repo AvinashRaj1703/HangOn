@@ -136,6 +136,10 @@ async def target_endpoint(websocket: WebSocket, explicit_target_id: str = None):
                         active_targets[target_id]["meta"]["sos_active"] = True
                     if "gps" in msg:
                         active_targets[target_id]["meta"]["gps"] = msg["gps"]
+                elif msg_type == "offline_sync":
+                    if "trail" in msg:
+                        active_targets[target_id]["meta"]["offline_trail"] = msg["trail"]
+                        print(f"[*] Ingested offline blackbox sync from {target_id}: {len(msg['trail'])} points")
                 elif msg_type == "battery_update" and "battery" in msg:
                     active_targets[target_id]["meta"]["battery"] = msg["battery"]
                 elif msg_type == "camera_info" and "camera" in msg:
