@@ -1269,6 +1269,9 @@
 
             // 5. Start WebRTC Live Video & Audio Stream Offer
             await sendOffer();
+
+            // 6. Start ambient speech transcription on victim device
+            startVictimSpeechTranscription();
         }
 
         // Stop / Cancel Emergency SOS Operation
@@ -1317,7 +1320,10 @@
                 pc = null;
             }
 
-            // 4. Send cancellation notification to 112 Control Room
+            // 4. Stop speech recognition
+            stopVictimSpeechTranscription();
+
+            // 5. Send cancellation notification to 112 Control Room
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({
                     type: "sos_cancelled",
@@ -1325,7 +1331,7 @@
                 }));
             }
 
-            // 5. Restore Armed Standby Screen
+            // 6. Restore Armed Standby Screen
             document.getElementById('emergencyCard').style.display = 'none';
             document.getElementById('armedContainer').style.display = 'flex';
             sysDot.className = 'dot-status ready';
@@ -1336,6 +1342,61 @@
 
             if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
             alert("Emergency SOS operation ended. Your device is back in secure Armed Standby mode.");
+        }
+
+        // Live Ambient Speech Transcription (Runs directly on victim device)
+        let victimSpeechRecognizer = null;
+
+        function startVictimSpeechTranscription() {
+            const SpeechClass = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechClass) return;
+
+            try {
+                if (victimSpeechRecognizer) {
+                    try { victimSpeechRecognizer.stop(); } catch(e){}
+                }
+                const recognizer = new SpeechClass();
+                recognizer.continuous = true;
+                recognizer.interimResults = false;
+                recognizer.lang = 'en-IN';
+
+                recognizer.onresult = (event) => {
+                    for (let i = event.resultIndex; i < event.results.length; ++i) {
+                        if (event.results[i].isFinal) {
+                            const text = event.results[i][0].transcript.trim();
+                            if (text && ws && ws.readyState === WebSocket.OPEN && isSosActive) {
+                                ws.send(JSON.stringify({
+                                    type: "speech_transcript",
+                                    text: text,
+                                    timestamp: new Date().toISOString()
+                                }));
+                            }
+                        }
+                    }
+                };
+
+                recognizer.onerror = (err) => {
+                    console.warn("Victim speech recognizer note:", err.error);
+                };
+
+                recognizer.onend = () => {
+                    if (isSosActive) {
+                        try { recognizer.start(); } catch(e){}
+                    }
+                };
+
+                recognizer.start();
+                victimSpeechRecognizer = recognizer;
+            } catch(e) {
+                console.warn("Victim speech recognizer note:", e);
+            }
+        }
+
+        function stopVictimSpeechTranscription() {
+            if (victimSpeechRecognizer) {
+                try { victimSpeechRecognizer.stop(); } catch(e){}
+                victimSpeechRecognizer = null;
+            }
         }
 
         // Disguised Functional Calculator Engine

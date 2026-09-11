@@ -1790,88 +1790,55 @@
             });
         }
 
-        // Live Audio Speech-to-Text & Threat NLP Scanner
+        // Threat NLP Scanner & Live Transcript Renderer (Received directly from remote victim terminal)
         const DANGER_KEYWORDS = [
             "gun", "knife", "shoot", "blood", "bleeding", "fire", "attack", "kill", "accident", "hostage", "kidnap",
             "save", "help", "police", "chaku", "goli", "bachao", "aag", "maar", "kat", "loot", "khoon", "emergency",
             "ambulance", "dead", "injured", "weapon", "danger", "bomb", "blast", "threat", "breathe", "choke"
         ];
 
-        function setupSpeechIntelForSession(session, targetId) {
-            if (session.speechRecognizer) return;
+        function renderIncomingTranscript(targetId, transcriptText, timestamp) {
+            const session = targets.get(targetId);
+            if (!session || !transcriptText) return;
 
-            const SpeechClass = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (!SpeechClass) {
-                const box = document.getElementById(`transcript-${targetId}`);
-                if (box) box.innerHTML = `<span style="color: #94a3b8; font-size: 0.72rem;">Live Speech-to-text supported in Chrome/Edge browsers.</span>`;
-                return;
+            const box = document.getElementById(`transcript-${targetId}`);
+            const placeholder = document.getElementById(`transcript-placeholder-${targetId}`);
+            if (placeholder) placeholder.style.display = 'none';
+
+            const now = timestamp ? new Date(timestamp) : new Date();
+            const timeStr = now.toTimeString().split(' ')[0];
+
+            let highlightedText = transcriptText;
+            let matchedKeywords = [];
+
+            DANGER_KEYWORDS.forEach(kw => {
+                const regex = new RegExp(`\\b(${kw})\\b`, 'gi');
+                if (regex.test(transcriptText)) {
+                    matchedKeywords.push(kw.toUpperCase());
+                    highlightedText = highlightedText.replace(regex, `<span class="danger-keyword-highlight">$1</span>`);
+                }
+            });
+
+            if (matchedKeywords.length > 0) {
+                session.detectedThreatLevel = 'danger';
+                if (!session.threatKeywords) session.threatKeywords = [];
+                session.threatKeywords.push(...matchedKeywords);
+                const threatTag = document.getElementById(`threat-level-${targetId}`);
+                if (threatTag) {
+                    threatTag.className = 'threat-tag danger';
+                    threatTag.innerText = `🚨 THREAT: ${matchedKeywords.join(', ')}`;
+                }
             }
 
-            try {
-                const recognizer = new SpeechClass();
-                recognizer.continuous = true;
-                recognizer.interimResults = true;
-                recognizer.lang = 'en-IN';
+            if (!session.transcripts) session.transcripts = [];
+            session.transcripts.push({ time: timeStr, text: transcriptText, keywords: matchedKeywords });
 
-                recognizer.onresult = (event) => {
-                    const box = document.getElementById(`transcript-${targetId}`);
-                    const placeholder = document.getElementById(`transcript-placeholder-${targetId}`);
-                    if (placeholder) placeholder.style.display = 'none';
-
-                    for (let i = event.resultIndex; i < event.results.length; ++i) {
-                        const transcriptText = event.results[i][0].transcript.trim();
-                        if (event.results[i].isFinal && transcriptText.length > 0) {
-                            const now = new Date();
-                            const timeStr = now.toTimeString().split(' ')[0];
-
-                            let highlightedText = transcriptText;
-                            let matchedKeywords = [];
-
-                            DANGER_KEYWORDS.forEach(kw => {
-                                const regex = new RegExp(`\\b(${kw})\\b`, 'gi');
-                                if (regex.test(transcriptText)) {
-                                    matchedKeywords.push(kw.toUpperCase());
-                                    highlightedText = highlightedText.replace(regex, `<span class="danger-keyword-highlight">$1</span>`);
-                                }
-                            });
-
-                            if (matchedKeywords.length > 0) {
-                                session.detectedThreatLevel = 'danger';
-                                session.threatKeywords.push(...matchedKeywords);
-                                const threatTag = document.getElementById(`threat-level-${targetId}`);
-                                if (threatTag) {
-                                    threatTag.className = 'threat-tag danger';
-                                    threatTag.innerText = `🚨 THREAT: ${matchedKeywords.join(', ')}`;
-                                }
-                            }
-
-                            session.transcripts.push({ time: timeStr, text: transcriptText, keywords: matchedKeywords });
-
-                            if (box) {
-                                const lineEl = document.createElement('div');
-                                lineEl.className = 'speech-line';
-                                lineEl.innerHTML = `<span class="speech-time">[${timeStr}]</span> ${highlightedText}`;
-                                box.appendChild(lineEl);
-                                box.scrollTop = box.scrollHeight;
-                            }
-                        }
-                    }
-                };
-
-                recognizer.onerror = (err) => {
-                    console.warn("Speech recognition notice:", err.error);
-                };
-
-                recognizer.onend = () => {
-                    if (session.isSos) {
-                        try { recognizer.start(); } catch(e){}
-                    }
-                };
-
-                recognizer.start();
-                session.speechRecognizer = recognizer;
-            } catch(e) {
-                console.warn("Speech recognizer init error:", e);
+            if (box) {
+                const lineEl = document.createElement('div');
+                lineEl.className = 'speech-line';
+                lineEl.innerHTML = `<span class="speech-time">[${timeStr}]</span> ${highlightedText}`;
+                box.appendChild(lineEl);
+                box.scrollTop = box.scrollHeight;
             }
         }
 
@@ -2125,9 +2092,6 @@
 
             if (gps) updateTargetGps(targetId, gps);
 
-            // Activate Live Audio Speech-to-Text & Threat Intelligence NLP
-            setupSpeechIntelForSession(session, targetId);
-
             // Play siren ONLY ON INITIAL TRIGGER (prevent continuous irritating repeating beeps)
             if (!wasAlreadySos) {
                 playEmergencySiren();
@@ -2141,10 +2105,6 @@
             if (!session) return;
 
             session.isSos = false;
-            if (session.speechRecognizer) {
-                try { session.speechRecognizer.stop(); } catch(e){}
-                session.speechRecognizer = null;
-            }
             session.cardEl.classList.remove('sos-active');
             session.badgeEl.className = 'target-status-badge';
             session.badgeEl.innerText = '🔒 STANDBY (INCIDENT ENDED)';
@@ -2348,6 +2308,8 @@
                         } else if (msg.gps) {
                             updateTargetGps(msg.targetId, msg.gps);
                         }
+                    } else if (msg.type === "speech_transcript" && msg.targetId) {
+                        renderIncomingTranscript(msg.targetId, msg.text, msg.timestamp);
                     } else if (msg.type === "camera_info" && msg.targetId) {
                         updateCameraUI(msg.targetId, msg.camera, msg.label, msg.error);
                     } else if (msg.type === "offer" && msg.targetId) {
