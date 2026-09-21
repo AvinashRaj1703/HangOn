@@ -873,29 +873,15 @@
                 <span>Accidental Touch Protection Active</span>
             </div>
 
-            <!-- Next-Gen Sensors Status Row -->
+            <!-- Next-Gen Sensors Status Row (100% Autonomous Hands-Free Protection) -->
             <div style="margin-top: 14px; width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: 10px; padding: 8px 10px; text-align: left;">
+                <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: 10px; padding: 10px 12px; text-align: left;">
                     <div style="font-size: 0.68rem; color: #fca5a5; font-weight: 800; text-transform: uppercase;">🚗 Auto-Crash Guard</div>
                     <div style="font-size: 0.76rem; color: #fff; font-weight: 700; margin-top: 2px;" id="crashStatusBadge">Armed (>18G Impact)</div>
                 </div>
-                <div style="background: rgba(0, 242, 254, 0.1); border: 1px solid rgba(0, 242, 254, 0.25); border-radius: 10px; padding: 8px 10px; text-align: left;">
+                <div style="background: rgba(0, 242, 254, 0.1); border: 1px solid rgba(0, 242, 254, 0.25); border-radius: 10px; padding: 10px 12px; text-align: left;">
                     <div style="font-size: 0.68rem; color: #7dd3fc; font-weight: 800; text-transform: uppercase;">🏢 Auto 3D Floor Guard</div>
                     <div style="font-size: 0.76rem; color: #fff; font-weight: 700; margin-top: 2px;" id="floorStatusBadge">1st Floor (Ground Level)</div>
-                </div>
-            </div>
-
-            <!-- Live Demo Simulation Controls (Developer / Demo Test Mode) -->
-            <div style="margin-top: 10px; display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 6px;">
-                <button onclick="simulateCrashImpact()" style="background: rgba(239,68,68,0.14); border: 1px dashed #ef4444; color: #fca5a5; padding: 7px 8px; border-radius: 8px; font-size: 0.7rem; font-weight: 700; cursor: pointer;">
-                    💥 Demo Crash Impact
-                </button>
-                <div style="background: rgba(0, 242, 254, 0.08); border: 1px dashed #00f2fe; border-radius: 8px; padding: 4px 6px; display: flex; align-items: center; justify-content: space-between;">
-                    <span style="font-size: 0.65rem; color: #7dd3fc; font-weight: 700;">Demo Floor:</span>
-                    <div style="display: flex; gap: 3px;">
-                        <button onclick="changeFloorManual(-1)" style="background: #0284c7; color: #fff; border: none; border-radius: 4px; padding: 2px 6px; font-size: 0.7rem; font-weight: 800; cursor: pointer;" title="Simulate down 1 floor">▼</button>
-                        <button onclick="changeFloorManual(1)" style="background: #0284c7; color: #fff; border: none; border-radius: 4px; padding: 2px 6px; font-size: 0.7rem; font-weight: 800; cursor: pointer;" title="Simulate up 1 floor">▲</button>
-                    </div>
                 </div>
             </div>
         </div>
