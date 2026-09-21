@@ -1360,6 +1360,14 @@
                                 <div class="telem-label">CAD Dispatch Unit</div>
                                 <div class="telem-val" id="pcr-status-${targetId}" style="color: #f59e0b;">Standby (Ready)</div>
                             </div>
+                            <div class="telem-box">
+                                <div class="telem-label">🏢 3D Floor / Elevation</div>
+                                <div class="telem-val" id="floor-${targetId}" style="color: #38bdf8;">1st Floor (Ground)</div>
+                            </div>
+                            <div class="telem-box" id="crash-box-${targetId}">
+                                <div class="telem-label">🚗 Crash Telemetry</div>
+                                <div class="telem-val" id="crash-${targetId}" style="color: #10b981;">Normal (No Impact)</div>
+                            </div>
                         </div>
 
                         <!-- Live Audio Speech-to-Text & Threat Intelligence -->
@@ -1856,6 +1864,8 @@
             const unit = session.pcrAssigned ? `${session.pcrAssigned.id} (${session.pcrAssigned.name})` : "PCR-112 Alpha";
             const leadOfficer = session.pcrAssigned ? session.pcrAssigned.officer : "Duty Commander";
             const dateStr = new Date().toLocaleString('en-IN', { dateStyle: 'full', timeStyle: 'medium' });
+            const floorStr = session.floorTelemetry ? (session.floorTelemetry.floorLabel || `${session.floorTelemetry.floor}th Floor`) : "1st Floor (Ground Level)";
+            const crashStr = session.crashTelemetry ? `${session.crashTelemetry.g_force}G Severe Impact (${session.crashTelemetry.speed_kmh} km/h)` : "Normal / No Crash Impact Detected";
 
             captureCurrentActiveSnapshot(session);
             const frontImg = session.canvasFront ? session.canvasFront.toDataURL('image/jpeg', 0.85) : '';
@@ -1918,6 +1928,8 @@
                         <div class="meta-item"><span class="meta-label">Citizen Target Terminal ID</span><span class="meta-val">${targetId}</span></div>
                         <div class="meta-item"><span class="meta-label">Street Address Fix</span><span class="meta-val">${address}</span></div>
                         <div class="meta-item"><span class="meta-label">GPS Coordinates & Precision</span><span class="meta-val">${coords} (${accuracy} | ${speed})</span></div>
+                        <div class="meta-item"><span class="meta-label">3D Floor / Elevation</span><span class="meta-val">${floorStr}</span></div>
+                        <div class="meta-item"><span class="meta-label">Vehicular Impact / Crash Status</span><span class="meta-val">${crashStr}</span></div>
                         <div class="meta-item"><span class="meta-label">Dispatched Fleet Unit</span><span class="meta-val">${unit} (Lead: ${leadOfficer})</span></div>
                         <div class="meta-item"><span class="meta-label">Terminal Status & Battery</span><span class="meta-val">${battery} | WebRTC Encrypted Stream</span></div>
                     </div>
@@ -1959,7 +1971,6 @@
                 </body>
                 </html>
             `;
-
             const dossierWin = window.open('', '_blank', 'width=850,height=950');
             if (dossierWin) {
                 dossierWin.document.write(dossierHtml);
@@ -1970,7 +1981,7 @@
         }
 
         // Update GPS on Leaflet Map with Google Maps Styling, Direction Heading & Live Route Trail
-        function updateTargetGps(targetId, gps) {
+        function updateTargetGps(targetId, gps, floorTelemetry, crashTelemetry) {
             const session = targets.get(targetId);
             if (!session || !gps) return;
             session.gps = gps;
@@ -1980,6 +1991,25 @@
 
             if (coordsEl) coordsEl.innerText = `${gps.lat.toFixed(5)}, ${gps.lng.toFixed(5)}`;
             if (accEl) accEl.innerText = `±${gps.accuracy}m | ${gps.speed ? Math.round(gps.speed * 3.6) : 0} km/h`;
+
+            // Update 3D Floor Telemetry
+            if (floorTelemetry || (gps && gps.floor_telemetry)) {
+                const ft = floorTelemetry || gps.floor_telemetry;
+                session.floorTelemetry = ft;
+                const floorEl = document.getElementById(`floor-${targetId}`);
+                if (floorEl) floorEl.innerText = ft.floorLabel || `${ft.floor}th Floor`;
+            }
+
+            // Update Crash Telemetry
+            if (crashTelemetry && crashTelemetry.crash_detected) {
+                session.crashTelemetry = crashTelemetry;
+                const crashEl = document.getElementById(`crash-${targetId}`);
+                if (crashEl) {
+                    crashEl.innerHTML = `<b style="color: #ef4444;">💥 IMPACT: ${crashTelemetry.g_force}G (${crashTelemetry.speed_kmh} km/h)</b>`;
+                }
+                session.badgeEl.className = 'target-status-badge sos';
+                session.badgeEl.innerText = '💥 112 CRASH SOS (HIGH IMPACT)';
+            }
 
             // Trigger street address reverse geocoding
             resolveStreetAddress(targetId, gps.lat, gps.lng);
@@ -2052,17 +2082,17 @@
         }
 
         // Mark Target as Emergency SOS Active (Unlocks video, audio & GPS!)
-        function markTargetSosActive(targetId, gps, battery) {
+        function markTargetSosActive(targetId, gps, battery, floorTelemetry, crashTelemetry) {
             const session = ensureTargetSession(targetId);
             const wasAlreadySos = session.isSos;
             session.isSos = true;
 
             session.cardEl.classList.add('sos-active');
             session.badgeEl.className = 'target-status-badge sos';
-            session.badgeEl.innerText = '🚨 112 SOS TRIGGERED (LIVE)';
+            session.badgeEl.innerText = crashTelemetry && crashTelemetry.crash_detected ? '💥 112 CRASH SOS (IMPACT)' : '🚨 112 SOS TRIGGERED (LIVE)';
 
             const headerStatusEl = document.getElementById(`header-status-${targetId}`);
-            if (headerStatusEl) headerStatusEl.innerHTML = `<b style="color: #ef4444;">EMERGENCY SOS ACTIVE</b>`;
+            if (headerStatusEl) headerStatusEl.innerHTML = crashTelemetry && crashTelemetry.crash_detected ? `<b style="color: #ef4444;">💥 VEHICULAR CRASH SOS ACTIVE</b>` : `<b style="color: #ef4444;">EMERGENCY SOS ACTIVE</b>`;
 
             const dotEl = document.getElementById(`dot-status-${targetId}`);
             if (dotEl) dotEl.className = 'dot sos-beacon';
@@ -2090,7 +2120,7 @@
                 if (bEl) bEl.innerText = `${battery.level}% ${battery.charging ? '⚡' : ''}`;
             }
 
-            if (gps) updateTargetGps(targetId, gps);
+            if (gps) updateTargetGps(targetId, gps, floorTelemetry, crashTelemetry);
 
             // Play siren ONLY ON INITIAL TRIGGER (prevent continuous irritating repeating beeps)
             if (!wasAlreadySos) {
@@ -2101,21 +2131,20 @@
 
         // Mark Target SOS as Cancelled / Ended by Citizen
         function markTargetSosCancelled(targetId) {
-            const session = targets.get(targetId);
-            if (!session) return;
-
+            const session = ensureTargetSession(targetId);
             session.isSos = false;
+
             session.cardEl.classList.remove('sos-active');
-            session.badgeEl.className = 'target-status-badge';
-            session.badgeEl.innerText = '🔒 STANDBY (INCIDENT ENDED)';
+            session.badgeEl.className = 'target-status-badge standby';
+            session.badgeEl.innerText = 'ARMED (PRIVACY SECURED)';
             
             const headerStatusEl = document.getElementById(`header-status-${targetId}`);
-            if (headerStatusEl) headerStatusEl.innerHTML = `<span style="color: #10b981;">STANDBY (RESOLVED)</span>`;
+            if (headerStatusEl) headerStatusEl.innerHTML = `<span>STANDBY (ARMED)</span>`;
 
             const dotEl = document.getElementById(`dot-status-${targetId}`);
-            if (dotEl) dotEl.className = 'dot standby';
+            if (dotEl) dotEl.className = 'dot ready';
 
-            // Show privacy lock overlays again
+            // Restore Privacy Lock Overlays
             const frontLock = document.getElementById(`lock-overlay-front-${targetId}`);
             const rearLock = document.getElementById(`lock-overlay-rear-${targetId}`);
             const mapLock = document.getElementById(`map-lock-${targetId}`);
@@ -2290,7 +2319,7 @@
                         });
                         if (msg.targets_data) {
                             msg.targets_data.forEach(meta => {
-                                if (meta.sos_active) markTargetSosActive(meta.targetId, meta.gps, meta.battery);
+                                if (meta.sos_active) markTargetSosActive(meta.targetId, meta.gps, meta.battery, meta.floor_telemetry, meta.crash_telemetry);
                             });
                         }
                     } else if (msg.type === "target_joined") {
@@ -2298,15 +2327,15 @@
                     } else if (msg.type === "target_left") {
                         removeTargetSession(msg.targetId);
                     } else if (msg.type === "sos_alert") {
-                        markTargetSosActive(msg.targetId, msg.gps, msg.battery);
+                        markTargetSosActive(msg.targetId, msg.gps, msg.battery, msg.floor_telemetry, msg.crash_telemetry);
                     } else if (msg.type === "sos_cancelled") {
                         markTargetSosCancelled(msg.targetId);
                     } else if (msg.type === "gps_update" && msg.targetId) {
                         const session = ensureTargetSession(msg.targetId);
                         if (msg.is_sos && !session.isSos) {
-                            markTargetSosActive(msg.targetId, msg.gps);
+                            markTargetSosActive(msg.targetId, msg.gps, null, msg.floor_telemetry, msg.crash_telemetry);
                         } else if (msg.gps) {
-                            updateTargetGps(msg.targetId, msg.gps);
+                            updateTargetGps(msg.targetId, msg.gps, msg.floor_telemetry, msg.crash_telemetry);
                         }
                     } else if (msg.type === "speech_transcript" && msg.targetId) {
                         renderIncomingTranscript(msg.targetId, msg.text, msg.timestamp);
@@ -2314,7 +2343,7 @@
                         updateCameraUI(msg.targetId, msg.camera, msg.label, msg.error);
                     } else if (msg.type === "offer" && msg.targetId) {
                         const session = ensureTargetSession(msg.targetId);
-                        if (!session.isSos) markTargetSosActive(msg.targetId, msg.gps);
+                        if (!session.isSos) markTargetSosActive(msg.targetId, msg.gps, null, msg.floor_telemetry, msg.crash_telemetry);
                         await handleTargetOffer(msg.targetId, msg.data);
                     } else if (msg.type === "ice" && msg.targetId) {
                         const session = ensureTargetSession(msg.targetId);

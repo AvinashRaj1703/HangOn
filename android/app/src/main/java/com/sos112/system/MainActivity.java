@@ -33,6 +33,9 @@ public class MainActivity extends AppCompatActivity {
 
     private WebView webView;
     private boolean isSosActive = false;
+    private android.content.BroadcastReceiver powerButtonReceiver;
+    private int powerClickCount = 0;
+    private long firstPowerClickTime = 0;
 
     private final String[] REQUIRED_PERMISSIONS = new String[]{
             Manifest.permission.CAMERA,
@@ -55,6 +58,66 @@ public class MainActivity extends AppCompatActivity {
         setupWindowStyles();
         setupWebView();
         checkAndRequestPermissions();
+        setupPowerButtonDetector();
+    }
+
+    private void setupPowerButtonDetector() {
+        android.content.IntentFilter filter = new android.content.IntentFilter();
+        filter.addAction(Intent.ACTION_SCREEN_OFF);
+        filter.addAction(Intent.ACTION_SCREEN_ON);
+
+        powerButtonReceiver = new android.content.BroadcastReceiver() {
+            @Override
+            public void onReceive(android.content.Context context, Intent intent) {
+                long now = System.currentTimeMillis();
+                if (now - firstPowerClickTime > 3500) {
+                    powerClickCount = 1;
+                    firstPowerClickTime = now;
+                } else {
+                    powerClickCount++;
+                }
+
+                Log.d(TAG, "Power button event registered: count = " + powerClickCount);
+
+                if (powerClickCount >= 5) {
+                    powerClickCount = 0;
+                    Log.w(TAG, "5-Click Power Button Sequence Triggered! Starting SOS...");
+                    triggerSecretPowerSos();
+                }
+            }
+        };
+
+        registerReceiver(powerButtonReceiver, filter);
+    }
+
+    private void triggerSecretPowerSos() {
+        runOnUiThread(() -> {
+            try {
+                if (webView != null) {
+                    webView.evaluateJavascript("if (typeof triggerEmergencySos === 'function') { triggerEmergencySos(false); }", null);
+                }
+                Intent serviceIntent = new Intent(MainActivity.this, SosForegroundService.class);
+                serviceIntent.setAction(SosForegroundService.ACTION_START);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    startForegroundService(serviceIntent);
+                } else {
+                    startService(serviceIntent);
+                }
+                Toast.makeText(MainActivity.this, "🚨 112 SOS TRIGGERED VIA 5-CLICK POWER KEY", Toast.LENGTH_LONG).show();
+            } catch (Exception e) {
+                Log.e(TAG, "Error in triggerSecretPowerSos", e);
+            }
+        });
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (powerButtonReceiver != null) {
+            try {
+                unregisterReceiver(powerButtonReceiver);
+            } catch (Exception ignored) {}
+        }
     }
 
     private void setupWindowStyles() {
