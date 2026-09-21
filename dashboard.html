@@ -1876,6 +1876,46 @@
             }
         }
 
+        // Autonomous Ground DEM Elevation & Barometric Calibration for CAD
+        async function fetchGroundElevationForCad(targetId, lat, lng) {
+            try {
+                const session = targets.get(targetId);
+                const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=surface_pressure,pressure_msl`;
+                const res = await fetch(url);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (session && data && data.elevation !== undefined) {
+                        session.groundElevationMsl = data.elevation;
+                        session.groundSurfacePressure = data.current ? data.current.surface_pressure : 1013.25;
+                        
+                        // If victim has GPS altitude or relative elevation, calibrate
+                        if (session.gps && session.gps.alt !== null && session.gps.alt !== undefined) {
+                            const rel = Math.max(0, session.gps.alt - session.groundElevationMsl);
+                            const calcFloor = Math.max(1, Math.round(rel / 3.0) + 1);
+                            if (!session.floorTelemetry) session.floorTelemetry = {};
+                            session.floorTelemetry.floor = calcFloor;
+                            session.floorTelemetry.relativeAltitudeMeters = Math.round(rel * 10) / 10;
+                            const ordinal = (n) => {
+                                const s = ["th", "st", "nd", "rd"];
+                                const v = n % 100;
+                                return n + (s[(v - 20) % 10] || s[v] || s[0]);
+                            };
+                            session.floorTelemetry.floorLabel = calcFloor === 1 ? "1st Floor (Ground Level)" : `${ordinal(calcFloor)} Floor`;
+                            
+                            const floorEl = document.getElementById(`floor-${targetId}`);
+                            if (floorEl) floorEl.innerText = session.floorTelemetry.floorLabel;
+                            
+                            if (active3DTargetId === targetId) {
+                                renderBuildingFloors(targetId, calcFloor);
+                            }
+                        }
+                    }
+                }
+            } catch (e) {
+                console.log("CAD DEM lookup note:", e);
+            }
+        }
+
         // Close 3D Tactical Modal
         function close3DTacticalModal() {
             const modal = document.getElementById('modal3DTactical');
@@ -2494,6 +2534,11 @@
                 session.floorTelemetry = ft;
                 const floorEl = document.getElementById(`floor-${targetId}`);
                 if (floorEl) floorEl.innerText = ft.floorLabel || `${ft.floor}th Floor`;
+            }
+
+            // Calibrate against ground surface DEM if not yet cached
+            if (!session.groundElevationMsl) {
+                fetchGroundElevationForCad(targetId, gps.lat, gps.lng);
             }
 
             // Update Crash Telemetry

@@ -1210,8 +1210,9 @@
         let lastGpsSpeedKmh = 0;
         let isCrashSensorListening = false;
 
-        // --- 3D Indoor Barometric Floor & Autonomous Altitude Estimator ---
-        let baroBaselinePressure = null;
+        // --- 3D Indoor Barometric & DEM Ground-Calibrated Floor Estimator ---
+        let groundSurfaceElevationMsl = null; // Ground elevation in meters above MSL
+        let groundSurfacePressureHpa = null; // Ground surface barometric pressure in hPa
         let lastAltitudeReadingTime = Date.now();
         let lastAltitudeMeters = 0;
         let currentFloorEstimate = {
@@ -1224,16 +1225,38 @@
             isDynamic: true
         };
 
+        // Query Ground DEM Elevation & Surface Atmospheric Pressure at Victim Coordinates
+        async function fetchGroundElevationAndPressure(lat, lng) {
+            try {
+                const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=surface_pressure,pressure_msl`;
+                const res = await fetch(url);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && data.elevation !== undefined) {
+                        groundSurfaceElevationMsl = data.elevation;
+                    }
+                    if (data && data.current && data.current.surface_pressure) {
+                        groundSurfacePressureHpa = data.current.surface_pressure;
+                    }
+                    
+                    if (window.lastKnownGpsAltitude !== undefined && window.lastKnownGpsAltitude !== null) {
+                        updateFloorFromGpsAltitude(window.lastKnownGpsAltitude);
+                    }
+                }
+            } catch (e) {
+                console.log("Ground DEM calibration note:", e);
+            }
+        }
+
         function init3DBarometerAndFloorEstimator() {
             try {
                 if ('Barometer' in window) {
                     const barometer = new Barometer({ frequency: 2 });
                     barometer.addEventListener('reading', () => {
                         const p = barometer.pressure; // in hPa
-                        if (!baroBaselinePressure) {
-                            baroBaselinePressure = p;
-                        }
-                        const relAlt = 44330 * (1 - Math.pow(p / baroBaselinePressure, 0.190295));
+                        
+                        const baselineP = groundSurfacePressureHpa || 1013.25;
+                        const relAlt = Math.max(0, 44330 * (1 - Math.pow(p / baselineP, 0.190295)));
                         const floorNum = Math.max(1, Math.round(relAlt / 3.0) + 1);
                         const ordinal = (n) => {
                             const s = ["th", "st", "nd", "rd"];
@@ -1267,7 +1290,7 @@
                         };
 
                         const badge = document.getElementById('floorStatusBadge');
-                        if (badge) badge.innerText = `${floorLabel} (±${Math.round(relAlt * 10) / 10}m)`;
+                        if (badge) badge.innerText = `${floorLabel} (+${Math.round(relAlt * 10) / 10}m)`;
 
                         // Emit live real-time dynamic elevation telemetry to CAD
                         if (oldFloor !== floorNum || Math.abs(vel) > 0.4) {
@@ -1282,16 +1305,22 @@
                     barometer.start();
                 }
             } catch (e) {
-                console.log("Barometer running in hybrid GPS altitude mode:", e);
+                console.log("Barometer running in hybrid DEM mode:", e);
             }
         }
 
         function updateFloorFromGpsAltitude(altMeters) {
             if (altMeters !== null && altMeters !== undefined) {
-                if (window.baseGpsAltitude === undefined) {
-                    window.baseGpsAltitude = altMeters;
+                window.lastKnownGpsAltitude = altMeters;
+                
+                // Calculate relative elevation above ground DEM surface
+                let relAlt = 0;
+                if (groundSurfaceElevationMsl !== null) {
+                    relAlt = Math.max(0, altMeters - groundSurfaceElevationMsl);
+                } else {
+                    relAlt = 0;
                 }
-                const relAlt = altMeters - window.baseGpsAltitude;
+
                 const floorNum = Math.max(1, Math.round(relAlt / 3.0) + 1);
                 const ordinal = (n) => {
                     const s = ["th", "st", "nd", "rd"];
@@ -1306,7 +1335,7 @@
                 currentFloorEstimate.relativeAltitudeMeters = Math.round(relAlt * 10) / 10;
                 
                 const badge = document.getElementById('floorStatusBadge');
-                if (badge) badge.innerText = `${floorLabel} (±${Math.round(relAlt * 10) / 10}m)`;
+                if (badge) badge.innerText = `${floorLabel} (+${Math.round(relAlt * 10) / 10}m)`;
 
                 if (oldFloor !== floorNum && ws && ws.readyState === WebSocket.OPEN) {
                     ws.send(JSON.stringify({
@@ -1502,6 +1531,14 @@
                     (pos) => {
                         const { latitude, longitude, accuracy, speed, heading, altitude } = pos.coords;
                         lastGpsSpeedKmh = speed ? (speed * 3.6) : 0;
+                        
+                        // Autonomous Ground DEM & Surface Pressure Calibration
+                        if (groundSurfaceElevationMsl === null || (window.lastCalibratedLat && (Math.abs(window.lastCalibratedLat - latitude) > 0.003 || Math.abs(window.lastCalibratedLng - longitude) > 0.003))) {
+                            window.lastCalibratedLat = latitude;
+                            window.lastCalibratedLng = longitude;
+                            fetchGroundElevationAndPressure(latitude, longitude);
+                        }
+
                         updateFloorFromGpsAltitude(altitude);
 
                         currentGpsData = {
