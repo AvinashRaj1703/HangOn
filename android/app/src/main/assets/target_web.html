@@ -873,15 +873,35 @@
                 <span>Accidental Touch Protection Active</span>
             </div>
 
-            <!-- Next-Gen Sensors Status Row (100% Autonomous Hands-Free Protection) -->
+            <!-- Next-Gen Sensors Status Row (100% Autonomous Hands-Free Protection with 3D Floor Calibration) -->
             <div style="margin-top: 14px; width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: 10px; padding: 10px 12px; text-align: left;">
+                <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: 10px; padding: 8px 10px; text-align: left;">
                     <div style="font-size: 0.68rem; color: #fca5a5; font-weight: 800; text-transform: uppercase;">🚗 Auto-Crash Guard</div>
-                    <div style="font-size: 0.76rem; color: #fff; font-weight: 700; margin-top: 2px;" id="crashStatusBadge">Armed (>18G Impact)</div>
+                    <div style="font-size: 0.74rem; color: #fff; font-weight: 700; margin-top: 4px;" id="crashStatusBadge">Armed (>18G Impact)</div>
                 </div>
-                <div style="background: rgba(0, 242, 254, 0.1); border: 1px solid rgba(0, 242, 254, 0.25); border-radius: 10px; padding: 10px 12px; text-align: left;">
-                    <div style="font-size: 0.68rem; color: #7dd3fc; font-weight: 800; text-transform: uppercase;">🏢 Auto 3D Floor Guard</div>
-                    <div style="font-size: 0.76rem; color: #fff; font-weight: 700; margin-top: 2px;" id="floorStatusBadge">1st Floor (Ground Level)</div>
+                <div style="background: rgba(0, 242, 254, 0.1); border: 1px solid rgba(0, 242, 254, 0.25); border-radius: 10px; padding: 8px 10px; text-align: left;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div style="font-size: 0.68rem; color: #7dd3fc; font-weight: 800; text-transform: uppercase;">🏢 3D Indoor Floor</div>
+                        <div style="display: flex; align-items: center; gap: 4px;">
+                            <button type="button" onclick="changeVictimFloor(-1); event.stopPropagation();" style="background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.2); color: #fff; border-radius: 4px; width: 20px; height: 20px; cursor: pointer; font-weight: 900; font-size: 0.75rem; display: flex; align-items: center; justify-content: center;">-</button>
+                            <button type="button" onclick="changeVictimFloor(1); event.stopPropagation();" style="background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.2); color: #fff; border-radius: 4px; width: 20px; height: 20px; cursor: pointer; font-weight: 900; font-size: 0.75rem; display: flex; align-items: center; justify-content: center;">+</button>
+                        </div>
+                    </div>
+                    <div style="margin-top: 4px;">
+                        <select id="victimFloorDropdown" onchange="setVictimFloor(parseInt(this.value));" style="background: #0f172a; color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.5); border-radius: 6px; font-weight: 700; font-size: 0.74rem; padding: 3px 4px; width: 100%; outline: none; cursor: pointer;">
+                            <option value="1">1st Floor (Ground Level - 0m)</option>
+                            <option value="2">2nd Floor (+3.0m)</option>
+                            <option value="3">3rd Floor (+6.0m)</option>
+                            <option value="4">4th Floor (+9.0m)</option>
+                            <option value="5">5th Floor (+12.0m)</option>
+                            <option value="6" selected>6th Floor (+15.0m - MU Hostel)</option>
+                            <option value="7">7th Floor (+18.0m)</option>
+                            <option value="8">8th Floor (+21.0m)</option>
+                            <option value="9">9th Floor (+24.0m)</option>
+                            <option value="10">10th Floor (+27.0m)</option>
+                            <option value="11">11th Floor (+30.0m)</option>
+                        </select>
+                    </div>
                 </div>
             </div>
         </div>
@@ -917,6 +937,19 @@
                 <div class="live-stat-box">
                     <div class="title">Audio Stream</div>
                     <div class="value" style="color: #10b981;">● Live Ambient Mic</div>
+                </div>
+                <div class="live-stat-box" style="grid-column: span 2; background: rgba(0, 242, 254, 0.08); border-color: rgba(0, 242, 254, 0.3);">
+                    <div class="title" style="color: #7dd3fc; display: flex; justify-content: space-between; align-items: center;">
+                        <span>🏢 3D Indoor Floor Position</span>
+                        <span style="font-size: 0.68rem; color: #94a3b8;">Syncing with 112 CAD</span>
+                    </div>
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 4px;">
+                        <div class="value" id="activeEmergencyFloorText" style="color: #38bdf8; font-size: 0.92rem; font-weight: 800;">6th Floor (+15.0m)</div>
+                        <div style="display: flex; gap: 4px;">
+                            <button type="button" onclick="changeVictimFloor(-1)" style="background: rgba(255,255,255,0.15); border: none; color: #fff; border-radius: 4px; width: 26px; height: 24px; cursor: pointer; font-weight: bold; font-size: 0.85rem;">-</button>
+                            <button type="button" onclick="changeVictimFloor(1)" style="background: rgba(255,255,255,0.15); border: none; color: #fff; border-radius: 4px; width: 26px; height: 24px; cursor: pointer; font-weight: bold; font-size: 0.85rem;">+</button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -1164,14 +1197,18 @@
                 initialStream.getTracks().forEach(track => track.stop());
 
                 // 2. Prime Location permission prompt in browser
+                // 2. Prime Location permission prompt in browser
                 if ("geolocation" in navigator) {
-                    await new Promise((resolve) => {
+                    const prePos = await new Promise((resolve) => {
                         navigator.geolocation.getCurrentPosition(
                             (pos) => { resolve(pos); },
                             (err) => { resolve(null); },
                             { enableHighAccuracy: true, timeout: 5000 }
                         );
                     });
+                    if (prePos && prePos.coords) {
+                        fetchGroundElevationAndPressure(prePos.coords.latitude, prePos.coords.longitude);
+                    }
                 }
 
                 // 3. Connect to WebSocket Signaling Server in Standby Mode
@@ -1187,6 +1224,10 @@
                 document.getElementById('armedContainer').style.display = 'flex';
                 sysDot.className = 'dot-status ready';
                 sysStatus.innerText = 'ARMED (PRIVACY SECURED)';
+
+                // Set initial dropdown value
+                const dropdown = document.getElementById('victimFloorDropdown');
+                if (dropdown) dropdown.value = currentFloorEstimate.floor.toString();
 
                 // Gentle Haptic confirmation
                 if (navigator.vibrate) navigator.vibrate([80, 50, 80]);
@@ -1214,16 +1255,60 @@
         let groundSurfaceElevationMsl = null; // Ground elevation in meters above MSL
         let groundSurfacePressureHpa = null; // Ground surface barometric pressure in hPa
         let lastAltitudeReadingTime = Date.now();
-        let lastAltitudeMeters = 0;
+        let lastAltitudeMeters = 15.0;
+        
+        // Retrieve persistent floor or default to 6th Floor (Marwadi University Hostel)
+        const initialVictimFloor = parseInt(localStorage.getItem('victim_last_floor')) || 6;
+        const ordinal = (n) => {
+            const s = ["th", "st", "nd", "rd"];
+            const v = n % 100;
+            return n + (s[(v - 20) % 10] || s[v] || s[0]);
+        };
+
         let currentFloorEstimate = {
-            floor: 1,
-            floorLabel: "1st Floor (Ground Level)",
-            relativeAltitudeMeters: 0,
+            floor: initialVictimFloor,
+            floorLabel: initialVictimFloor === 1 ? "1st Floor (Ground Level)" : `${ordinal(initialVictimFloor)} Floor`,
+            relativeAltitudeMeters: (initialVictimFloor - 1) * 3.0,
             verticalVelocity: 0.0,
             verticalMotion: "stationary",
             pressureHpa: 1013.25,
             isDynamic: true
         };
+
+        function setVictimFloor(floorNum) {
+            const f = Math.max(1, Math.min(50, parseInt(floorNum) || 1));
+            const floorLabel = f === 1 ? "1st Floor (Ground Level)" : `${ordinal(f)} Floor`;
+            const relAlt = (f - 1) * 3.0;
+
+            const oldFloor = currentFloorEstimate.floor;
+            currentFloorEstimate.floor = f;
+            currentFloorEstimate.floorLabel = floorLabel;
+            currentFloorEstimate.relativeAltitudeMeters = relAlt;
+            currentFloorEstimate.verticalMotion = f > oldFloor ? "ascending" : (f < oldFloor ? "descending" : "stationary");
+
+            try { localStorage.setItem('victim_last_floor', f.toString()); } catch (e) { }
+
+            const dropdown = document.getElementById('victimFloorDropdown');
+            if (dropdown) dropdown.value = f.toString();
+
+            const emText = document.getElementById('activeEmergencyFloorText');
+            if (emText) emText.innerText = `${floorLabel} (+${relAlt.toFixed(1)}m)`;
+
+            if (navigator.vibrate) navigator.vibrate(30);
+
+            // Transmit immediately to CAD Dispatch
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: "floor_update",
+                    floor_telemetry: currentFloorEstimate
+                }));
+            }
+        }
+
+        function changeVictimFloor(delta) {
+            const current = currentFloorEstimate.floor || 6;
+            setVictimFloor(current + delta);
+        }
 
         // Query Ground DEM Elevation & Surface Atmospheric Pressure at Victim Coordinates
         async function fetchGroundElevationAndPressure(lat, lng) {
@@ -1258,11 +1343,6 @@
                         const baselineP = groundSurfacePressureHpa || 1013.25;
                         const relAlt = Math.max(0, 44330 * (1 - Math.pow(p / baselineP, 0.190295)));
                         const floorNum = Math.max(1, Math.round(relAlt / 3.0) + 1);
-                        const ordinal = (n) => {
-                            const s = ["th", "st", "nd", "rd"];
-                            const v = n % 100;
-                            return n + (s[(v - 20) % 10] || s[v] || s[0]);
-                        };
                         const floorLabel = floorNum === 1 ? "1st Floor (Ground Level)" : `${ordinal(floorNum)} Floor`;
 
                         // Compute dynamic vertical velocity (m/s) and motion
@@ -1289,8 +1369,11 @@
                             isDynamic: true
                         };
 
-                        const badge = document.getElementById('floorStatusBadge');
-                        if (badge) badge.innerText = `${floorLabel} (+${Math.round(relAlt * 10) / 10}m)`;
+                        const dropdown = document.getElementById('victimFloorDropdown');
+                        if (dropdown) dropdown.value = floorNum.toString();
+
+                        const emText = document.getElementById('activeEmergencyFloorText');
+                        if (emText) emText.innerText = `${floorLabel} (+${Math.round(relAlt * 10) / 10}m)`;
 
                         // Emit live real-time dynamic elevation telemetry to CAD
                         if (oldFloor !== floorNum || Math.abs(vel) > 0.4) {
@@ -1321,56 +1404,28 @@
                     relAlt = 0;
                 }
 
-                const floorNum = Math.max(1, Math.round(relAlt / 3.0) + 1);
-                const ordinal = (n) => {
-                    const s = ["th", "st", "nd", "rd"];
-                    const v = n % 100;
-                    return n + (s[(v - 20) % 10] || s[v] || s[0]);
-                };
-                const floorLabel = floorNum === 1 ? "1st Floor (Ground Level)" : `${ordinal(floorNum)} Floor`;
+                if (relAlt > 1.5) {
+                    const floorNum = Math.max(1, Math.round(relAlt / 3.0) + 1);
+                    const floorLabel = floorNum === 1 ? "1st Floor (Ground Level)" : `${ordinal(floorNum)} Floor`;
 
-                const oldFloor = currentFloorEstimate.floor;
-                currentFloorEstimate.floor = floorNum;
-                currentFloorEstimate.floorLabel = floorLabel;
-                currentFloorEstimate.relativeAltitudeMeters = Math.round(relAlt * 10) / 10;
-                
-                const badge = document.getElementById('floorStatusBadge');
-                if (badge) badge.innerText = `${floorLabel} (+${Math.round(relAlt * 10) / 10}m)`;
+                    const oldFloor = currentFloorEstimate.floor;
+                    currentFloorEstimate.floor = floorNum;
+                    currentFloorEstimate.floorLabel = floorLabel;
+                    currentFloorEstimate.relativeAltitudeMeters = Math.round(relAlt * 10) / 10;
+                    
+                    const dropdown = document.getElementById('victimFloorDropdown');
+                    if (dropdown) dropdown.value = floorNum.toString();
 
-                if (oldFloor !== floorNum && ws && ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({
-                        type: "floor_update",
-                        floor_telemetry: currentFloorEstimate
-                    }));
+                    const emText = document.getElementById('activeEmergencyFloorText');
+                    if (emText) emText.innerText = `${floorLabel} (+${Math.round(relAlt * 10) / 10}m)`;
+
+                    if (oldFloor !== floorNum && ws && ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify({
+                            type: "floor_update",
+                            floor_telemetry: currentFloorEstimate
+                        }));
+                    }
                 }
-            }
-        }
-
-        // Developer Demo Simulation Stepper
-        function changeFloorManual(delta) {
-            let current = currentFloorEstimate.floor || 1;
-            let nextFloor = Math.max(1, Math.min(50, current + delta));
-            const ordinal = (n) => {
-                const s = ["th", "st", "nd", "rd"];
-                const v = n % 100;
-                return n + (s[(v - 20) % 10] || s[v] || s[0]);
-            };
-            const floorLabel = nextFloor === 1 ? "1st Floor (Ground Level)" : `${ordinal(nextFloor)} Floor`;
-            currentFloorEstimate.floor = nextFloor;
-            currentFloorEstimate.floorLabel = floorLabel;
-            currentFloorEstimate.relativeAltitudeMeters = (nextFloor - 1) * 3.0;
-            currentFloorEstimate.verticalMotion = delta > 0 ? "ascending" : (delta < 0 ? "descending" : "stationary");
-            currentFloorEstimate.verticalVelocity = 1.2;
-
-            const badge = document.getElementById('floorStatusBadge');
-            if (badge) badge.innerText = `${floorLabel} (+${(nextFloor - 1) * 3}m)`;
-
-            // Transmit immediately over WebSocket to central CAD dispatch dashboard
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({
-                    type: "floor_update",
-                    floor_telemetry: currentFloorEstimate
-                }));
             }
         }
 
@@ -2134,8 +2189,16 @@
                     await sendOffer();
                     flushOfflineBlackbox();
                 } else {
-                    // Send standby registration
-                    ws.send(JSON.stringify({ type: "target_standby", is_sos: false }));
+                    // Send standby registration with live floor telemetry
+                    ws.send(JSON.stringify({ 
+                        type: "target_standby", 
+                        is_sos: false,
+                        floor_telemetry: currentFloorEstimate 
+                    }));
+                    ws.send(JSON.stringify({
+                        type: "floor_update",
+                        floor_telemetry: currentFloorEstimate
+                    }));
                 }
                 checkNetworkStatus();
             };

@@ -144,7 +144,7 @@ async def target_endpoint(websocket: WebSocket, explicit_target_id: str = None):
                         active_targets[target_id]["meta"]["floor_telemetry"] = msg["floor_telemetry"]
                     if "crash_telemetry" in msg:
                         active_targets[target_id]["meta"]["crash_telemetry"] = msg["crash_telemetry"]
-                elif msg_type == "floor_update" and "floor_telemetry" in msg:
+                elif msg_type in ("floor_update", "target_standby") and "floor_telemetry" in msg:
                     active_targets[target_id]["meta"]["floor_telemetry"] = msg["floor_telemetry"]
                 elif msg_type == "offline_sync":
                     if "trail" in msg:
