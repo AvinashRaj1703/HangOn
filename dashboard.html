@@ -504,24 +504,35 @@
         /* Middle Section: GPS Map & Telemetry */
         .card-middle-section {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: 1.15fr 0.85fr;
             border-top: 1px solid var(--border-color);
             background: #080d1a;
-            min-height: 220px;
+            min-height: 480px;
+            align-items: stretch;
         }
 
         .map-container {
             width: 100%;
-            height: 240px;
+            height: 100%;
+            min-height: 480px;
             background: #050811;
             border-right: 1px solid var(--border-color);
             position: relative;
             overflow: hidden;
-            transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+            transition: min-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .map-container .leaflet-container {
+            width: 100% !important;
+            height: 100% !important;
+            flex: 1;
+            background: #050811 !important;
         }
 
         .map-container.expanded {
-            height: 480px;
+            min-height: 650px;
         }
 
         .map-container.fullscreen-mode {
@@ -533,6 +544,13 @@
             border-radius: 0 !important;
             border: none !important;
             box-shadow: none !important;
+        }
+
+        /* 3D Perspective Tilt Mode */
+        .map-container.tilt-3d .leaflet-map-pane {
+            transform: perspective(850px) rotateX(42deg) scale(1.18);
+            transform-origin: center bottom;
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .map-container .leaflet-tile {
@@ -1320,10 +1338,12 @@
                     <div class="map-container" id="map-${targetId}">
                         <div class="map-toolbar" id="map-toolbar-${targetId}">
                             <button class="btn-map-ctrl" onclick="recenterMap('${targetId}')" title="Fly to victim location">🎯 Center</button>
-                            <button class="btn-map-ctrl active-layer" id="layerBtn-roads-${targetId}" onclick="setMapLayer('${targetId}', 'roads')" title="Google Maps HD Roads & POIs">🗺️ Google Roads</button>
+                            <button class="btn-map-ctrl active-layer" id="layerBtn-roads-${targetId}" onclick="setMapLayer('${targetId}', 'roads')" title="Google Maps HD Roads & POIs">🗺️ Roads</button>
                             <button class="btn-map-ctrl" id="layerBtn-hybrid-${targetId}" onclick="setMapLayer('${targetId}', 'hybrid')" title="Google Maps Satellite Hybrid">🛰️ Satellite</button>
                             <button class="btn-map-ctrl" id="layerBtn-traffic-${targetId}" onclick="setMapLayer('${targetId}', 'traffic')" title="Google Maps Live Real-time Traffic">🚦 Traffic</button>
                             <button class="btn-map-ctrl" id="layerBtn-terrain-${targetId}" onclick="setMapLayer('${targetId}', 'terrain')" title="Google Maps Topographic Terrain">⛰️ Terrain</button>
+                            <button class="btn-map-ctrl" id="tiltBtn-${targetId}" onclick="toggle3DTilt('${targetId}')" title="Toggle 3D Perspective Tilt View">🏢 3D Tilt</button>
+                            <button class="btn-map-ctrl" onclick="openGoogleEarth3D('${targetId}')" title="Open Google Earth Photorealistic 3D Globe">🌐 3D Earth</button>
                             <button class="btn-map-ctrl" onclick="openGoogleMaps('${targetId}')" title="Open directly in Google Maps">↗️ Google Maps</button>
                             <button class="btn-map-ctrl" onclick="openStreetView('${targetId}')" title="Open Google Street View">🚶 Street View</button>
                             <button class="btn-map-ctrl" id="expandBtn-${targetId}" onclick="toggleExpandMap('${targetId}')" title="Expand / Minimize map view">⛶ Expand</button>
@@ -1521,7 +1541,68 @@
             drawPlaceholder(canvasRear, "REAR CAMERA (CLICK TO ACTIVATE)");
             assignNearestPcrUnit(targetId);
             updateCounts();
+
+            // Auto-ResizeObserver & Periodic Invalidation to ensure Map takes 100% full height without black gaps
+            const mapElDom = card.querySelector(`#map-${targetId}`);
+            if (window.ResizeObserver && mapElDom) {
+                const ro = new ResizeObserver(() => {
+                    if (session.mapInstance) session.mapInstance.invalidateSize();
+                });
+                ro.observe(mapElDom);
+            }
+            setTimeout(() => { if (session.mapInstance) session.mapInstance.invalidateSize(); }, 100);
+            setTimeout(() => { if (session.mapInstance) session.mapInstance.invalidateSize(); }, 500);
+
             return session;
+        }
+
+        // Toggle 3D Perspective Tilt Angle on Leaflet Map
+        function toggle3DTilt(targetId) {
+            const session = targets.get(targetId);
+            const mapEl = document.getElementById(`map-${targetId}`);
+            const btn = document.getElementById(`tiltBtn-${targetId}`);
+            if (!session || !mapEl || !session.mapInstance) return;
+
+            session.is3DTilt = !session.is3DTilt;
+            if (session.is3DTilt) {
+                mapEl.classList.add('tilt-3d');
+                if (btn) {
+                    btn.classList.add('active-layer');
+                    btn.innerText = "🏢 2D Flat";
+                }
+                // Automatically activate Satellite Hybrid for stunning 3D building perspective
+                if (session.currentLayerKey === 'roads') {
+                    setMapLayer(targetId, 'hybrid');
+                }
+            } else {
+                mapEl.classList.remove('tilt-3d');
+                if (btn) {
+                    btn.classList.remove('active-layer');
+                    btn.innerText = "🏢 3D Tilt";
+                }
+            }
+
+            setTimeout(() => {
+                session.mapInstance.invalidateSize();
+                if (session.gps) {
+                    session.mapInstance.panTo([session.gps.lat, session.gps.lng]);
+                }
+            }, 300);
+        }
+
+        // Open Google Earth Photorealistic 3D Globe with 45-degree angle
+        function openGoogleEarth3D(targetId) {
+            const session = targets.get(targetId);
+            if (session && session.gps && session.gps.lat && session.gps.lng) {
+                const lat = session.gps.lat;
+                const lng = session.gps.lng;
+                const alt = session.gps.alt || 50;
+                // Google Earth Photogrammetry 3D View (45 deg tilt, 600m distance)
+                const url = `https://earth.google.com/web/@${lat},${lng},${alt}a,600d,35y,45h,60t,0r`;
+                window.open(url, '_blank');
+            } else {
+                alert("Target location not yet acquired. Waiting for GPS fix.");
+            }
         }
 
         // Google Maps Layer Definitions
