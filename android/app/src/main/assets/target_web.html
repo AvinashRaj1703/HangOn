@@ -880,7 +880,13 @@
                     <div style="font-size: 0.76rem; color: #fff; font-weight: 700; margin-top: 2px;" id="crashStatusBadge">Armed (>18G Impact)</div>
                 </div>
                 <div style="background: rgba(0, 242, 254, 0.1); border: 1px solid rgba(0, 242, 254, 0.25); border-radius: 10px; padding: 8px 10px; text-align: left;">
-                    <div style="font-size: 0.68rem; color: #7dd3fc; font-weight: 800; text-transform: uppercase;">🏢 3D Indoor Floor</div>
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <div style="font-size: 0.68rem; color: #7dd3fc; font-weight: 800; text-transform: uppercase;">🏢 3D Indoor Floor</div>
+                        <div style="display: flex; gap: 4px;">
+                            <button onclick="changeFloorManual(1)" style="background: #0284c7; color: #fff; border: none; border-radius: 4px; padding: 2px 7px; font-size: 0.72rem; font-weight: 800; cursor: pointer;" title="Simulate going up 1 floor">▲</button>
+                            <button onclick="changeFloorManual(-1)" style="background: #0284c7; color: #fff; border: none; border-radius: 4px; padding: 2px 7px; font-size: 0.72rem; font-weight: 800; cursor: pointer;" title="Simulate going down 1 floor">▼</button>
+                        </div>
+                    </div>
                     <div style="font-size: 0.76rem; color: #fff; font-weight: 700; margin-top: 2px;" id="floorStatusBadge">1st Floor (Ground)</div>
                 </div>
             </div>
@@ -1279,6 +1285,32 @@
                 
                 const badge = document.getElementById('floorStatusBadge');
                 if (badge) badge.innerText = floorLabel;
+            }
+        }
+
+        // Manual Floor Simulation Stepper for Demos & Testing
+        function changeFloorManual(delta) {
+            let current = currentFloorEstimate.floor || 1;
+            let nextFloor = Math.max(1, Math.min(50, current + delta));
+            const ordinal = (n) => {
+                const s = ["th", "st", "nd", "rd"];
+                const v = n % 100;
+                return n + (s[(v - 20) % 10] || s[v] || s[0]);
+            };
+            const floorLabel = nextFloor === 1 ? "1st Floor (Ground)" : `${ordinal(nextFloor)} Floor`;
+            currentFloorEstimate.floor = nextFloor;
+            currentFloorEstimate.floorLabel = floorLabel;
+            currentFloorEstimate.relativeAltitudeMeters = (nextFloor - 1) * 3.0;
+
+            const badge = document.getElementById('floorStatusBadge');
+            if (badge) badge.innerText = floorLabel;
+
+            // Transmit immediately over WebSocket to central CAD dispatch dashboard
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: "floor_update",
+                    floor_telemetry: currentFloorEstimate
+                }));
             }
         }
 

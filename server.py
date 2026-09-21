@@ -122,13 +122,17 @@ async def target_endpoint(websocket: WebSocket, explicit_target_id: str = None):
                     break
                 continue
 
-            # Update cached metadata if SOS, GPS, or battery info arrives
+            # Update cached metadata if SOS, GPS, floor, or battery info arrives
             msg_type = msg.get("type")
             if target_id in active_targets:
                 if msg_type in ("sos_alert", "sos_activated"):
                     active_targets[target_id]["meta"]["sos_active"] = True
                     if "gps" in msg:
                         active_targets[target_id]["meta"]["gps"] = msg["gps"]
+                    if "floor_telemetry" in msg:
+                        active_targets[target_id]["meta"]["floor_telemetry"] = msg["floor_telemetry"]
+                    if "crash_telemetry" in msg:
+                        active_targets[target_id]["meta"]["crash_telemetry"] = msg["crash_telemetry"]
                 elif msg_type == "sos_cancelled":
                     active_targets[target_id]["meta"]["sos_active"] = False
                 elif msg_type == "gps_update":
@@ -136,6 +140,12 @@ async def target_endpoint(websocket: WebSocket, explicit_target_id: str = None):
                         active_targets[target_id]["meta"]["sos_active"] = True
                     if "gps" in msg:
                         active_targets[target_id]["meta"]["gps"] = msg["gps"]
+                    if "floor_telemetry" in msg:
+                        active_targets[target_id]["meta"]["floor_telemetry"] = msg["floor_telemetry"]
+                    if "crash_telemetry" in msg:
+                        active_targets[target_id]["meta"]["crash_telemetry"] = msg["crash_telemetry"]
+                elif msg_type == "floor_update" and "floor_telemetry" in msg:
+                    active_targets[target_id]["meta"]["floor_telemetry"] = msg["floor_telemetry"]
                 elif msg_type == "offline_sync":
                     if "trail" in msg:
                         active_targets[target_id]["meta"]["offline_trail"] = msg["trail"]

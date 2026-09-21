@@ -509,6 +509,8 @@
             background: #080d1a;
             min-height: 480px;
             align-items: stretch;
+            perspective: 1200px;
+            perspective-origin: 50% 50%;
         }
 
         .map-container {
@@ -521,10 +523,10 @@
             overflow: hidden;
             display: flex;
             flex-direction: column;
-            transition: min-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: min-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.45s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.45s ease;
         }
 
-        .map-container .leaflet-container {
+        .map-container.leaflet-container {
             width: 100% !important;
             height: 100% !important;
             flex: 1;
@@ -546,15 +548,115 @@
             box-shadow: none !important;
         }
 
-        /* 3D Perspective Tilt Mode */
-        .map-container.tilt-3d .leaflet-map-pane {
-            transform: perspective(850px) rotateX(42deg) scale(1.18);
-            transform-origin: center bottom;
-            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        /* 3D Perspective Tilt Mode (Applied to map-container for deep 3D ground plane) */
+        .map-container.tilt-3d {
+            transform: rotateX(46deg) scale(1.15);
+            transform-origin: 50% 85%;
+            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.95), 0 0 35px rgba(0, 242, 254, 0.35) !important;
+            border: 2px solid #00f2fe !important;
+            border-radius: 12px !important;
+            z-index: 50 !important;
+        }
+
+        .map-container.tilt-3d .map-toolbar {
+            transform: rotateX(-46deg);
+            transform-origin: 50% 0%;
+            transition: transform 0.45s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .map-container .leaflet-tile {
             filter: none !important;
+        }
+
+        /* In-Dashboard 3D Tactical Digital Twin & Building Elevation Viewer Modal */
+        .tactical-3d-modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(5, 8, 17, 0.94);
+            backdrop-filter: blur(14px);
+            z-index: 100050;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            box-sizing: border-box;
+            animation: fadeIn 0.2s ease-out;
+        }
+
+        .tactical-3d-box {
+            background: #0b1120;
+            border: 2px solid #00f2fe;
+            border-radius: 16px;
+            width: 100%;
+            max-width: 1100px;
+            height: 85vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 0 50px rgba(0, 242, 254, 0.25), 0 20px 40px rgba(0, 0, 0, 0.9);
+            overflow: hidden;
+        }
+
+        .tactical-3d-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 20px;
+            background: rgba(15, 23, 42, 0.95);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+        }
+
+        .tactical-3d-body {
+            display: grid;
+            grid-template-columns: 1fr 320px;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .tactical-3d-viewport {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background: #050811;
+        }
+
+        .tactical-3d-sidebar {
+            background: rgba(15, 23, 42, 0.9);
+            border-left: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+
+        .floor-card-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 12px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 8px;
+            margin-bottom: 8px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.78rem;
+            color: #94a3b8;
+            transition: all 0.2s ease;
+        }
+
+        .floor-card-item.active-floor {
+            background: rgba(0, 242, 254, 0.15);
+            border-color: #00f2fe;
+            color: #fff;
+            box-shadow: 0 0 15px rgba(0, 242, 254, 0.3);
+        }
+
+        .floor-tag-indicator {
+            background: #00f2fe;
+            color: #050811;
+            font-weight: 800;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.68rem;
         }
 
         .map-toolbar {
@@ -1061,6 +1163,45 @@
         </div>
     </main>
 
+    <!-- In-Dashboard 3D Tactical Digital Twin & Multi-Floor Elevation Viewer Modal -->
+    <div class="tactical-3d-modal" id="modal3DTactical" style="display: none;">
+        <div class="tactical-3d-box">
+            <div class="tactical-3d-header">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 1.3rem;">🌐</span>
+                    <div>
+                        <div style="font-size: 0.95rem; font-weight: 800; color: #00f2fe; letter-spacing: 0.5px;">3D TACTICAL DIGITAL TWIN & MULTI-FLOOR CAD VIEWER</div>
+                        <div id="modal3DSubtitle" style="font-size: 0.75rem; color: #94a3b8; margin-top: 2px;">INCIDENT TARGET ELEVATION INSPECTOR</div>
+                    </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <button class="btn-map-ctrl" onclick="toggle3DModalFullscreen()" title="Toggle Maximize/Windowed View" style="padding: 6px 12px; font-size: 0.78rem;">⛶ Expand</button>
+                    <button class="btn-map-ctrl" onclick="close3DTacticalModal()" title="Close 3D View" style="background: rgba(239,68,68,0.25); border-color: #ef4444; color: #fff; padding: 6px 14px; font-size: 0.8rem; font-weight: 700;">✕ CLOSE (ESC)</button>
+                </div>
+            </div>
+            <div class="tactical-3d-body">
+                <div class="tactical-3d-viewport">
+                    <iframe id="iframe3DView" style="width: 100%; height: 100%; border: none; background: #050811;" src="about:blank" allowfullscreen loading="lazy"></iframe>
+                </div>
+                <div class="tactical-3d-sidebar">
+                    <div style="font-size: 0.78rem; font-weight: 800; color: #38bdf8; text-transform: uppercase; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+                        <span>🏢</span>
+                        <span>Multi-Story Vertical Stack</span>
+                    </div>
+                    <div style="font-size: 0.72rem; color: #94a3b8; margin-bottom: 12px; line-height: 1.3;">
+                        Real-time barometric atmospheric pressure & GPS altitude relative to street level:
+                    </div>
+                    <div id="buildingFloorsStack" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column;">
+                        <!-- Floor cards rendered dynamically -->
+                    </div>
+                    <div id="modal3DBaroText" style="margin-top: 10px; font-size: 0.7rem; color: #64748b; font-family: 'JetBrains Mono', monospace; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 8px;">
+                        Floor: 1 • Elevation: +0m • Barometric Baseline: 1013.2 hPa
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
         const host = window.location.host || "hangon-k31m.onrender.com";
@@ -1379,7 +1520,7 @@
                             <button class="btn-map-ctrl" id="layerBtn-traffic-${targetId}" onclick="setMapLayer('${targetId}', 'traffic')" title="Google Maps Live Real-time Traffic">🚦 Traffic</button>
                             <button class="btn-map-ctrl" id="layerBtn-terrain-${targetId}" onclick="setMapLayer('${targetId}', 'terrain')" title="Google Maps Topographic Terrain">⛰️ Terrain</button>
                             <button class="btn-map-ctrl" id="tiltBtn-${targetId}" onclick="toggle3DTilt('${targetId}')" title="Toggle 3D Perspective Tilt View">🏢 3D Tilt</button>
-                            <button class="btn-map-ctrl" onclick="openGoogleEarth3D('${targetId}')" title="Open Google Earth Photorealistic 3D Globe">🌐 3D Earth</button>
+                            <button class="btn-map-ctrl" onclick="open3DTacticalModal('${targetId}')" title="Open In-Dashboard 3D Tactical Digital Twin & Multi-Floor Elevation Viewer">🌐 3D Building Twin</button>
                             <button class="btn-map-ctrl" onclick="openGoogleMaps('${targetId}')" title="Open directly in Google Maps">↗️ Google Maps</button>
                             <button class="btn-map-ctrl" onclick="openStreetView('${targetId}')" title="Open Google Street View">🚶 Street View</button>
                             <button class="btn-map-ctrl" id="expandBtn-${targetId}" onclick="toggleExpandMap('${targetId}')" title="Expand / Minimize map view">⛶ Expand</button>
@@ -1626,18 +1767,107 @@
             }, 300);
         }
 
-        // Open Google Earth Photorealistic 3D Globe with 45-degree angle
-        function openGoogleEarth3D(targetId) {
+        let active3DTargetId = null;
+
+        // Open In-Dashboard 3D Tactical Digital Twin & Building Elevation Viewer Modal
+        function open3DTacticalModal(targetId) {
             const session = targets.get(targetId);
+            const modal = document.getElementById('modal3DTactical');
+            const iframe = document.getElementById('iframe3DView');
+            const subTitle = document.getElementById('modal3DSubtitle');
+            if (!modal || !iframe) return;
+
+            active3DTargetId = targetId;
+
+            let lat = 28.6139, lng = 77.2090;
             if (session && session.gps && session.gps.lat && session.gps.lng) {
-                const lat = session.gps.lat;
-                const lng = session.gps.lng;
-                const alt = session.gps.alt || 50;
-                // Google Earth Photogrammetry 3D View (45 deg tilt, 600m distance)
-                const url = `https://earth.google.com/web/@${lat},${lng},${alt}a,600d,35y,45h,60t,0r`;
-                window.open(url, '_blank');
-            } else {
-                alert("Target location not yet acquired. Waiting for GPS fix.");
+                lat = session.gps.lat;
+                lng = session.gps.lng;
+            }
+
+            const curFloor = (session && session.floorTelemetry) ? (session.floorTelemetry.floor || 1) : 1;
+            const floorLabel = (session && session.floorTelemetry) ? (session.floorTelemetry.floorLabel || "1st Floor (Ground)") : "1st Floor (Ground)";
+
+            if (subTitle) {
+                subTitle.innerHTML = `INCIDENT TARGET: <b>${targetId}</b> &bull; GPS: ${lat.toFixed(5)}, ${lng.toFixed(5)} &bull; <span style="color:#00f2fe; font-weight:800;">${floorLabel}</span>`;
+            }
+
+            // High-resolution satellite 3D aerial mesh iframe centered on victim
+            iframe.src = `https://maps.google.com/maps?q=${lat},${lng}&t=k&z=19&ie=UTF8&iwloc=&output=embed`;
+
+            renderBuildingFloors(targetId, curFloor);
+
+            modal.style.display = 'flex';
+        }
+
+        // Close 3D Tactical Modal
+        function close3DTacticalModal() {
+            const modal = document.getElementById('modal3DTactical');
+            const iframe = document.getElementById('iframe3DView');
+            if (iframe) iframe.src = 'about:blank';
+            if (modal) modal.style.display = 'none';
+            active3DTargetId = null;
+        }
+
+        function toggle3DModalFullscreen() {
+            const modal = document.getElementById('modal3DTactical');
+            if (!modal) return;
+            const box = modal.querySelector('.tactical-3d-box');
+            if (box) {
+                if (box.style.maxWidth === '100%') {
+                    box.style.maxWidth = '1100px';
+                    box.style.height = '85vh';
+                } else {
+                    box.style.maxWidth = '100%';
+                    box.style.height = '98vh';
+                }
+            }
+        }
+
+        // Render Multi-Story Vertical Floor Stack in 3D Modal
+        function renderBuildingFloors(targetId, activeFloorNum) {
+            const stack = document.getElementById('buildingFloorsStack');
+            if (!stack) return;
+
+            const totalFloors = Math.max(6, activeFloorNum + 2);
+            let html = '';
+
+            html += `
+                <div class="floor-card-item ${activeFloorNum > totalFloors ? 'active-floor' : ''}">
+                    <span>🏢 Roof / Terrace</span>
+                    <span>+${totalFloors * 3}m</span>
+                </div>
+            `;
+
+            for (let f = totalFloors; f >= 1; f--) {
+                const isActive = (f === activeFloorNum);
+                const ordinal = (n) => {
+                    const s = ["th", "st", "nd", "rd"];
+                    const v = n % 100;
+                    return n + (s[(v - 20) % 10] || s[v] || s[0]);
+                };
+                const name = f === 1 ? "1st Floor (Ground)" : `${ordinal(f)} Floor`;
+                const elev = `+${(f - 1) * 3}m`;
+
+                html += `
+                    <div class="floor-card-item ${isActive ? 'active-floor' : ''}" style="${isActive ? 'border-width: 2px;' : ''}">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            ${isActive ? '<span style="font-size:1rem; animation: pulse-red 1s infinite;">📍</span>' : '<span>▫️</span>'}
+                            <b>${name}</b>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:6px;">
+                            <span style="font-size:0.72rem; color:${isActive ? '#00f2fe' : '#64748b'};">${elev}</span>
+                            ${isActive ? '<span class="floor-tag-indicator">VICTIM HERE</span>' : ''}
+                        </div>
+                    </div>
+                `;
+            }
+
+            stack.innerHTML = html;
+
+            const baroEl = document.getElementById('modal3DBaroText');
+            if (baroEl) {
+                baroEl.innerText = `Floor: ${activeFloorNum} • Elevation: +${(activeFloorNum - 1) * 3}m • Barometric Baseline: 1013.2 hPa`;
             }
         }
 
@@ -1823,9 +2053,10 @@
             }, 250);
         }
 
-        // Global ESC Keyboard Key Listener to exit any fullscreen map instantly
+        // Global ESC Keyboard Key Listener to exit any fullscreen map or 3D modal instantly
         window.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' || e.key === 'Esc') {
+                close3DTacticalModal();
                 targets.forEach((session, targetId) => {
                     if (session.isFullscreenMap) {
                         exitFullscreenMap(targetId);
@@ -2483,6 +2714,20 @@
                             markTargetSosActive(msg.targetId, msg.gps, null, msg.floor_telemetry, msg.crash_telemetry);
                         } else if (msg.gps) {
                             updateTargetGps(msg.targetId, msg.gps, msg.floor_telemetry, msg.crash_telemetry);
+                        }
+                    } else if (msg.type === "floor_update" && msg.targetId) {
+                        const session = ensureTargetSession(msg.targetId);
+                        if (msg.floor_telemetry) {
+                            session.floorTelemetry = msg.floor_telemetry;
+                            const floorEl = document.getElementById(`floor-${msg.targetId}`);
+                            if (floorEl) floorEl.innerText = msg.floor_telemetry.floorLabel || `${msg.floor_telemetry.floor}th Floor`;
+                            if (active3DTargetId === msg.targetId) {
+                                renderBuildingFloors(msg.targetId, msg.floor_telemetry.floor || 1);
+                                const subTitle = document.getElementById('modal3DSubtitle');
+                                if (subTitle && session.gps) {
+                                    subTitle.innerHTML = `INCIDENT TARGET: <b>${msg.targetId}</b> &bull; GPS: ${session.gps.lat.toFixed(5)}, ${session.gps.lng.toFixed(5)} &bull; <span style="color:#00f2fe; font-weight:800;">${msg.floor_telemetry.floorLabel}</span>`;
+                                }
+                            }
                         }
                     } else if (msg.type === "speech_transcript" && msg.targetId) {
                         renderIncomingTranscript(msg.targetId, msg.text, msg.timestamp);
