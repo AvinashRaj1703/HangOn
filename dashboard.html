@@ -563,10 +563,41 @@
             right: 10px;
             display: flex;
             gap: 6px;
-            z-index: 600;
+            z-index: 10000;
             flex-wrap: wrap;
             justify-content: flex-end;
             max-width: 90%;
+        }
+
+        /* Persistent High-Visibility Floating Fullscreen Exit Button */
+        .btn-exit-fs {
+            display: none;
+            position: absolute;
+            top: 16px;
+            left: 16px;
+            background: #ef4444;
+            color: #ffffff;
+            border: 2px solid #ffffff;
+            padding: 9px 18px;
+            border-radius: 999px;
+            font-size: 0.85rem;
+            font-weight: 800;
+            font-family: 'JetBrains Mono', monospace;
+            cursor: pointer;
+            z-index: 100001;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.7), 0 0 20px rgba(239, 68, 68, 0.7);
+            transition: all 0.2s ease;
+        }
+
+        .btn-exit-fs:hover {
+            background: #dc2626;
+            transform: scale(1.05);
+        }
+
+        .map-container.fullscreen-mode .btn-exit-fs {
+            display: flex;
+            align-items: center;
+            gap: 6px;
         }
 
         .btn-map-ctrl {
@@ -1336,6 +1367,11 @@
                 <!-- GPS & CAD Dispatch Panel -->
                 <div class="card-middle-section">
                     <div class="map-container" id="map-${targetId}">
+                        <!-- Floating Fullscreen Exit Button -->
+                        <button class="btn-exit-fs" id="exitFsBtn-${targetId}" onclick="exitFullscreenMap('${targetId}')" title="Exit Fullscreen Map (or press ESC)">
+                            ✕ EXIT FULLSCREEN (ESC)
+                        </button>
+
                         <div class="map-toolbar" id="map-toolbar-${targetId}">
                             <button class="btn-map-ctrl" onclick="recenterMap('${targetId}')" title="Fly to victim location">🎯 Center</button>
                             <button class="btn-map-ctrl active-layer" id="layerBtn-roads-${targetId}" onclick="setMapLayer('${targetId}', 'roads')" title="Google Maps HD Roads & POIs">🗺️ Roads</button>
@@ -1767,6 +1803,36 @@
                 }
             }, 250);
         }
+
+        // Direct Dedicated Function to Exit Fullscreen Map Mode
+        function exitFullscreenMap(targetId) {
+            const session = targets.get(targetId);
+            const mapEl = document.getElementById(`map-${targetId}`);
+            const btn = document.getElementById(`fsBtn-${targetId}`);
+            if (!session || !mapEl || !session.mapInstance) return;
+
+            session.isFullscreenMap = false;
+            mapEl.classList.remove('fullscreen-mode');
+            if (btn) btn.innerText = "⛶ Fullscreen";
+
+            setTimeout(() => {
+                session.mapInstance.invalidateSize();
+                if (session.gps) {
+                    session.mapInstance.panTo([session.gps.lat, session.gps.lng]);
+                }
+            }, 250);
+        }
+
+        // Global ESC Keyboard Key Listener to exit any fullscreen map instantly
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' || e.key === 'Esc') {
+                targets.forEach((session, targetId) => {
+                    if (session.isFullscreenMap) {
+                        exitFullscreenMap(targetId);
+                    }
+                });
+            }
+        });
 
         function drawPlaceholder(canvas, text) {
             if (!canvas) return;
