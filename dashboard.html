@@ -509,8 +509,6 @@
             background: #080d1a;
             min-height: 480px;
             align-items: stretch;
-            perspective: 1200px;
-            perspective-origin: 50% 50%;
         }
 
         .map-container {
@@ -523,14 +521,24 @@
             overflow: hidden;
             display: flex;
             flex-direction: column;
-            transition: min-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.45s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.45s ease;
+            perspective: 1200px;
+            perspective-origin: 50% 50%;
+            transition: min-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        .map-container.leaflet-container {
+        .map-viewport {
             width: 100% !important;
             height: 100% !important;
             flex: 1;
             background: #050811 !important;
+            transition: transform 0.45s cubic-bezier(0.4, 0, 0.2, 1), filter 0.45s ease;
+        }
+
+        /* 3D Perspective Tilt Mode (Applied ONLY to map-viewport so toolbar stays completely flat and accessible) */
+        .map-viewport.tilt-3d {
+            transform: rotateX(46deg) scale(1.18);
+            transform-origin: 50% 85%;
+            filter: drop-shadow(0 30px 45px rgba(0, 0, 0, 0.95));
         }
 
         .map-container.expanded {
@@ -548,20 +556,28 @@
             box-shadow: none !important;
         }
 
-        /* 3D Perspective Tilt Mode (Applied to map-container for deep 3D ground plane) */
-        .map-container.tilt-3d {
-            transform: rotateX(46deg) scale(1.15);
-            transform-origin: 50% 85%;
-            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.95), 0 0 35px rgba(0, 242, 254, 0.35) !important;
-            border: 2px solid #00f2fe !important;
-            border-radius: 12px !important;
-            z-index: 50 !important;
+        .btn-floor-chip {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #94a3b8;
+            border-radius: 4px;
+            padding: 3px 7px;
+            font-size: 0.68rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
         }
-
-        .map-container.tilt-3d .map-toolbar {
-            transform: rotateX(-46deg);
-            transform-origin: 50% 0%;
-            transition: transform 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+        .btn-floor-chip:hover {
+            background: rgba(0, 242, 254, 0.2);
+            color: #fff;
+            border-color: #00f2fe;
+        }
+        .btn-floor-chip.active {
+            background: #00f2fe;
+            color: #050811;
+            border-color: #00f2fe;
+            font-weight: 800;
         }
 
         .map-container .leaflet-tile {
@@ -1184,13 +1200,46 @@
                     <iframe id="iframe3DView" style="width: 100%; height: 100%; border: none; background: #050811;" src="about:blank" allowfullscreen loading="lazy"></iframe>
                 </div>
                 <div class="tactical-3d-sidebar">
-                    <div style="font-size: 0.78rem; font-weight: 800; color: #38bdf8; text-transform: uppercase; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
-                        <span>🏢</span>
-                        <span>Multi-Story Vertical Stack</span>
+                    <div style="font-size: 0.78rem; font-weight: 800; color: #38bdf8; text-transform: uppercase; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between;">
+                        <span style="display: flex; align-items: center; gap: 6px;">
+                            <span>🏢</span>
+                            <span>Building Floor Profile</span>
+                        </span>
+                        <span id="osmBuildingTagBadge" style="font-size: 0.65rem; color: #10b981; font-weight: 700; background: rgba(16,185,129,0.15); padding: 2px 6px; border-radius: 4px;">OSM AUTO</span>
                     </div>
-                    <div style="font-size: 0.72rem; color: #94a3b8; margin-bottom: 12px; line-height: 1.3;">
-                        Real-time barometric atmospheric pressure & GPS altitude relative to street level:
+
+                    <!-- Building Height Profile Stepper & Presets -->
+                    <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 10px; padding: 10px 12px; margin-bottom: 12px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                            <span style="font-size: 0.72rem; color: #94a3b8; font-weight: 700;">TOTAL FLOORS:</span>
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <button onclick="changeModalBuildingFloors(-1)" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; border-radius: 4px; padding: 2px 8px; font-weight: 800; cursor: pointer;">-</button>
+                                <span id="modalFloorsCountText" style="font-size: 0.85rem; color: #00f2fe; font-weight: 800; min-width: 34px; text-align: center;">11F</span>
+                                <button onclick="changeModalBuildingFloors(1)" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; border-radius: 4px; padding: 2px 8px; font-weight: 800; cursor: pointer;">+</button>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 4px; overflow-x: auto; padding-top: 2px;" id="modalFloorPresets">
+                            <button onclick="setModalBuildingFloors(5)" class="btn-floor-chip" id="chip-5">5F</button>
+                            <button onclick="setModalBuildingFloors(8)" class="btn-floor-chip" id="chip-8">8F</button>
+                            <button onclick="setModalBuildingFloors(11)" class="btn-floor-chip active" id="chip-11">11F</button>
+                            <button onclick="setModalBuildingFloors(15)" class="btn-floor-chip" id="chip-15">15F</button>
+                            <button onclick="setModalBuildingFloors(20)" class="btn-floor-chip" id="chip-20">20F</button>
+                            <button onclick="setModalBuildingFloors(30)" class="btn-floor-chip" id="chip-30">30F</button>
+                        </div>
                     </div>
+
+                    <!-- Dynamic Vertical Motion & Elevation Telemetry -->
+                    <div id="modalMotionBanner" style="background: rgba(0, 242, 254, 0.08); border: 1px solid rgba(0, 242, 254, 0.25); border-radius: 8px; padding: 8px 10px; margin-bottom: 12px; font-family: 'JetBrains Mono', monospace; font-size: 0.72rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="color: #94a3b8;">VERTICAL STATUS:</span>
+                            <b id="modalMotionStatus" style="color: #10b981;">● STATIONARY</b>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
+                            <span style="color: #94a3b8;">RELATIVE ELEVATION:</span>
+                            <b id="modalElevText" style="color: #00f2fe;">+0.0m</b>
+                        </div>
+                    </div>
+
                     <div id="buildingFloorsStack" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column;">
                         <!-- Floor cards rendered dynamically -->
                     </div>
@@ -1507,7 +1556,7 @@
 
                 <!-- GPS & CAD Dispatch Panel -->
                 <div class="card-middle-section">
-                    <div class="map-container" id="map-${targetId}">
+                    <div class="map-container" id="map-wrap-${targetId}">
                         <!-- Floating Fullscreen Exit Button -->
                         <button class="btn-exit-fs" id="exitFsBtn-${targetId}" onclick="exitFullscreenMap('${targetId}')" title="Exit Fullscreen Map (or press ESC)">
                             ✕ EXIT FULLSCREEN (ESC)
@@ -1526,6 +1575,9 @@
                             <button class="btn-map-ctrl" id="expandBtn-${targetId}" onclick="toggleExpandMap('${targetId}')" title="Expand / Minimize map view">⛶ Expand</button>
                             <button class="btn-map-ctrl" id="fsBtn-${targetId}" onclick="fullscreenMap('${targetId}')" title="Toggle Fullscreen Map">⛶ Fullscreen</button>
                         </div>
+
+                        <div class="map-viewport" id="map-${targetId}"></div>
+
                         <div class="map-privacy-overlay" id="map-lock-${targetId}">
                             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--accent-cyan); margin-bottom: 4px;"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
                             <strong style="color: #fff;">GPS Location Locked</strong>
@@ -1770,7 +1822,7 @@
         let active3DTargetId = null;
 
         // Open In-Dashboard 3D Tactical Digital Twin & Building Elevation Viewer Modal
-        function open3DTacticalModal(targetId) {
+        async function open3DTacticalModal(targetId) {
             const session = targets.get(targetId);
             const modal = document.getElementById('modal3DTactical');
             const iframe = document.getElementById('iframe3DView');
@@ -1783,6 +1835,11 @@
             if (session && session.gps && session.gps.lat && session.gps.lng) {
                 lat = session.gps.lat;
                 lng = session.gps.lng;
+            }
+
+            if (!session.buildingTotalFloors) {
+                session.buildingTotalFloors = 11; // Default to 11 floors (Hostel / High-Rise)
+                queryBuildingLevelsFromOsm(targetId, lat, lng);
             }
 
             const curFloor = (session && session.floorTelemetry) ? (session.floorTelemetry.floor || 1) : 1;
@@ -1798,6 +1855,54 @@
             renderBuildingFloors(targetId, curFloor);
 
             modal.style.display = 'flex';
+        }
+
+        // Query OpenStreetMap Overpass for building tags
+        async function queryBuildingLevelsFromOsm(targetId, lat, lng) {
+            try {
+                const session = targets.get(targetId);
+                const query = `[out:json][timeout:3];way(around:60,${lat},${lng})["building"];out tags;`;
+                const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
+                const res = await fetch(url);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && data.elements && data.elements.length > 0) {
+                        for (let el of data.elements) {
+                            if (el.tags && el.tags['building:levels']) {
+                                const levels = parseInt(el.tags['building:levels']);
+                                if (levels && levels >= 1 && levels <= 100) {
+                                    if (session) session.buildingTotalFloors = levels;
+                                    if (active3DTargetId === targetId) {
+                                        renderBuildingFloors(targetId, (session.floorTelemetry ? session.floorTelemetry.floor : 1));
+                                    }
+                                    const badge = document.getElementById('osmBuildingTagBadge');
+                                    if (badge) badge.innerText = `OSM: ${levels}F (${el.tags.name || 'Building'})`;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (e) {
+                console.log("OSM Overpass building query note:", e);
+            }
+        }
+
+        function setModalBuildingFloors(count) {
+            if (!active3DTargetId) return;
+            const session = targets.get(active3DTargetId);
+            if (!session) return;
+            session.buildingTotalFloors = Math.max(1, Math.min(100, count));
+            const curFloor = session.floorTelemetry ? (session.floorTelemetry.floor || 1) : 1;
+            renderBuildingFloors(active3DTargetId, curFloor);
+        }
+
+        function changeModalBuildingFloors(delta) {
+            if (!active3DTargetId) return;
+            const session = targets.get(active3DTargetId);
+            if (!session) return;
+            const cur = session.buildingTotalFloors || 11;
+            setModalBuildingFloors(cur + delta);
         }
 
         // Close 3D Tactical Modal
@@ -1827,14 +1932,49 @@
         // Render Multi-Story Vertical Floor Stack in 3D Modal
         function renderBuildingFloors(targetId, activeFloorNum) {
             const stack = document.getElementById('buildingFloorsStack');
+            const session = targets.get(targetId);
             if (!stack) return;
 
-            const totalFloors = Math.max(6, activeFloorNum + 2);
+            const totalFloors = Math.max(activeFloorNum, (session && session.buildingTotalFloors) ? session.buildingTotalFloors : 11);
+            
+            const countText = document.getElementById('modalFloorsCountText');
+            if (countText) countText.innerText = `${totalFloors}F`;
+
+            // Update Preset Chips Active State
+            const presets = [5, 8, 11, 15, 20, 30];
+            presets.forEach(p => {
+                const chip = document.getElementById(`chip-${p}`);
+                if (chip) {
+                    if (p === totalFloors) chip.classList.add('active');
+                    else chip.classList.remove('active');
+                }
+            });
+
+            // Update Dynamic Motion Banner
+            const ft = session ? session.floorTelemetry : null;
+            const motionEl = document.getElementById('modalMotionStatus');
+            const elevEl = document.getElementById('modalElevText');
+            if (motionEl && ft) {
+                if (ft.verticalMotion === "ascending") {
+                    motionEl.innerHTML = `<span style="color:#00f2fe; animation: pulse-fast 0.8s infinite;">▲ ASCENDING (+${ft.verticalVelocity || 1.0} m/s)</span>`;
+                } else if (ft.verticalMotion === "descending") {
+                    motionEl.innerHTML = `<span style="color:#f59e0b; animation: pulse-fast 0.8s infinite;">▼ DESCENDING (-${ft.verticalVelocity || 1.0} m/s)</span>`;
+                } else {
+                    motionEl.innerHTML = `<span style="color:#10b981;">● STATIONARY (FLOOR ${activeFloorNum})</span>`;
+                }
+            }
+            if (elevEl && ft) {
+                elevEl.innerText = `+${ft.relativeAltitudeMeters || ((activeFloorNum - 1) * 3)}m (${ft.pressureHpa ? ft.pressureHpa + ' hPa' : '1013.2 hPa'})`;
+            }
+
             let html = '';
 
             html += `
                 <div class="floor-card-item ${activeFloorNum > totalFloors ? 'active-floor' : ''}">
-                    <span>🏢 Roof / Terrace</span>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span>🏢</span>
+                        <b>Roof / Terrace Deck</b>
+                    </div>
                     <span>+${totalFloors * 3}m</span>
                 </div>
             `;
@@ -1846,13 +1986,13 @@
                     const v = n % 100;
                     return n + (s[(v - 20) % 10] || s[v] || s[0]);
                 };
-                const name = f === 1 ? "1st Floor (Ground)" : `${ordinal(f)} Floor`;
+                const name = f === 1 ? "1st Floor (Ground Level)" : `${ordinal(f)} Floor`;
                 const elev = `+${(f - 1) * 3}m`;
 
                 html += `
-                    <div class="floor-card-item ${isActive ? 'active-floor' : ''}" style="${isActive ? 'border-width: 2px;' : ''}">
+                    <div id="floor-card-row-${f}" class="floor-card-item ${isActive ? 'active-floor' : ''}" style="${isActive ? 'border-width: 2px;' : ''}">
                         <div style="display:flex; align-items:center; gap:8px;">
-                            ${isActive ? '<span style="font-size:1rem; animation: pulse-red 1s infinite;">📍</span>' : '<span>▫️</span>'}
+                            ${isActive ? '<span style="font-size:1rem; animation: pulse-red 1s infinite;">📍</span>' : '<span style="color:#475569;">▫️</span>'}
                             <b>${name}</b>
                         </div>
                         <div style="display:flex; align-items:center; gap:6px;">
@@ -1864,6 +2004,14 @@
             }
 
             stack.innerHTML = html;
+
+            // Smoothly auto-scroll active floor into view
+            setTimeout(() => {
+                const activeRow = document.getElementById(`floor-card-row-${activeFloorNum}`);
+                if (activeRow && stack) {
+                    activeRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+            }, 50);
 
             const baroEl = document.getElementById('modal3DBaroText');
             if (baroEl) {
@@ -1990,16 +2138,16 @@
 
         function toggleExpandMap(targetId) {
             const session = targets.get(targetId);
-            const mapEl = document.getElementById(`map-${targetId}`);
+            const mapWrap = document.getElementById(`map-wrap-${targetId}`) || document.getElementById(`map-${targetId}`);
             const btn = document.getElementById(`expandBtn-${targetId}`);
-            if (!session || !mapEl || !session.mapInstance) return;
+            if (!session || !mapWrap || !session.mapInstance) return;
 
             session.isMapExpanded = !session.isMapExpanded;
             if (session.isMapExpanded) {
-                mapEl.classList.add('expanded');
+                mapWrap.classList.add('expanded');
                 if (btn) btn.innerText = "⛶ Minimize";
             } else {
-                mapEl.classList.remove('expanded');
+                mapWrap.classList.remove('expanded');
                 if (btn) btn.innerText = "⛶ Expand";
             }
 
@@ -2013,16 +2161,16 @@
 
         function fullscreenMap(targetId) {
             const session = targets.get(targetId);
-            const mapEl = document.getElementById(`map-${targetId}`);
+            const mapWrap = document.getElementById(`map-wrap-${targetId}`) || document.getElementById(`map-${targetId}`);
             const btn = document.getElementById(`fsBtn-${targetId}`);
-            if (!session || !mapEl || !session.mapInstance) return;
+            if (!session || !mapWrap || !session.mapInstance) return;
 
             session.isFullscreenMap = !session.isFullscreenMap;
             if (session.isFullscreenMap) {
-                mapEl.classList.add('fullscreen-mode');
+                mapWrap.classList.add('fullscreen-mode');
                 if (btn) btn.innerText = "✕ Exit Fullscreen";
             } else {
-                mapEl.classList.remove('fullscreen-mode');
+                mapWrap.classList.remove('fullscreen-mode');
                 if (btn) btn.innerText = "⛶ Fullscreen";
             }
 
@@ -2037,12 +2185,12 @@
         // Direct Dedicated Function to Exit Fullscreen Map Mode
         function exitFullscreenMap(targetId) {
             const session = targets.get(targetId);
-            const mapEl = document.getElementById(`map-${targetId}`);
+            const mapWrap = document.getElementById(`map-wrap-${targetId}`) || document.getElementById(`map-${targetId}`);
             const btn = document.getElementById(`fsBtn-${targetId}`);
-            if (!session || !mapEl || !session.mapInstance) return;
+            if (!session || !mapWrap || !session.mapInstance) return;
 
             session.isFullscreenMap = false;
-            mapEl.classList.remove('fullscreen-mode');
+            mapWrap.classList.remove('fullscreen-mode');
             if (btn) btn.innerText = "⛶ Fullscreen";
 
             setTimeout(() => {

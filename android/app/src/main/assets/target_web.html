@@ -880,22 +880,24 @@
                     <div style="font-size: 0.76rem; color: #fff; font-weight: 700; margin-top: 2px;" id="crashStatusBadge">Armed (>18G Impact)</div>
                 </div>
                 <div style="background: rgba(0, 242, 254, 0.1); border: 1px solid rgba(0, 242, 254, 0.25); border-radius: 10px; padding: 8px 10px; text-align: left;">
-                    <div style="display: flex; align-items: center; justify-content: space-between;">
-                        <div style="font-size: 0.68rem; color: #7dd3fc; font-weight: 800; text-transform: uppercase;">🏢 3D Indoor Floor</div>
-                        <div style="display: flex; gap: 4px;">
-                            <button onclick="changeFloorManual(1)" style="background: #0284c7; color: #fff; border: none; border-radius: 4px; padding: 2px 7px; font-size: 0.72rem; font-weight: 800; cursor: pointer;" title="Simulate going up 1 floor">▲</button>
-                            <button onclick="changeFloorManual(-1)" style="background: #0284c7; color: #fff; border: none; border-radius: 4px; padding: 2px 7px; font-size: 0.72rem; font-weight: 800; cursor: pointer;" title="Simulate going down 1 floor">▼</button>
-                        </div>
-                    </div>
-                    <div style="font-size: 0.76rem; color: #fff; font-weight: 700; margin-top: 2px;" id="floorStatusBadge">1st Floor (Ground)</div>
+                    <div style="font-size: 0.68rem; color: #7dd3fc; font-weight: 800; text-transform: uppercase;">🏢 Auto 3D Floor Guard</div>
+                    <div style="font-size: 0.76rem; color: #fff; font-weight: 700; margin-top: 2px;" id="floorStatusBadge">1st Floor (Ground Level)</div>
                 </div>
             </div>
 
-            <!-- Auto-Crash Simulation Button for Live Demo & Testing -->
-            <button onclick="simulateCrashImpact()" style="margin-top: 10px; width: 100%; background: rgba(239,68,68,0.14); border: 1px dashed #ef4444; color: #fca5a5; padding: 8px 12px; border-radius: 8px; font-size: 0.74rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
-                <span>💥</span>
-                <span>Simulate High-G Crash Impact (10s Grace Demo)</span>
-            </button>
+            <!-- Live Demo Simulation Controls (Developer / Demo Test Mode) -->
+            <div style="margin-top: 10px; display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 6px;">
+                <button onclick="simulateCrashImpact()" style="background: rgba(239,68,68,0.14); border: 1px dashed #ef4444; color: #fca5a5; padding: 7px 8px; border-radius: 8px; font-size: 0.7rem; font-weight: 700; cursor: pointer;">
+                    💥 Demo Crash Impact
+                </button>
+                <div style="background: rgba(0, 242, 254, 0.08); border: 1px dashed #00f2fe; border-radius: 8px; padding: 4px 6px; display: flex; align-items: center; justify-content: space-between;">
+                    <span style="font-size: 0.65rem; color: #7dd3fc; font-weight: 700;">Demo Floor:</span>
+                    <div style="display: flex; gap: 3px;">
+                        <button onclick="changeFloorManual(-1)" style="background: #0284c7; color: #fff; border: none; border-radius: 4px; padding: 2px 6px; font-size: 0.7rem; font-weight: 800; cursor: pointer;" title="Simulate down 1 floor">▼</button>
+                        <button onclick="changeFloorManual(1)" style="background: #0284c7; color: #fff; border: none; border-radius: 4px; padding: 2px 6px; font-size: 0.7rem; font-weight: 800; cursor: pointer;" title="Simulate up 1 floor">▲</button>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Step 3: Emergency Active Screen -->
@@ -1222,22 +1224,27 @@
         let lastGpsSpeedKmh = 0;
         let isCrashSensorListening = false;
 
-        // --- 3D Indoor Barometric Floor & Altitude Estimator ---
-        let baroBaselinePressure = 1013.25; // Standard Sea Level hPa
+        // --- 3D Indoor Barometric Floor & Autonomous Altitude Estimator ---
+        let baroBaselinePressure = null;
+        let lastAltitudeReadingTime = Date.now();
+        let lastAltitudeMeters = 0;
         let currentFloorEstimate = {
             floor: 1,
-            floorLabel: "1st Floor (Ground)",
+            floorLabel: "1st Floor (Ground Level)",
             relativeAltitudeMeters: 0,
-            pressureHpa: 1013.25
+            verticalVelocity: 0.0,
+            verticalMotion: "stationary",
+            pressureHpa: 1013.25,
+            isDynamic: true
         };
 
         function init3DBarometerAndFloorEstimator() {
             try {
                 if ('Barometer' in window) {
-                    const barometer = new Barometer({ frequency: 1 });
+                    const barometer = new Barometer({ frequency: 2 });
                     barometer.addEventListener('reading', () => {
                         const p = barometer.pressure; // in hPa
-                        if (!baroBaselinePressure || baroBaselinePressure === 1013.25) {
+                        if (!baroBaselinePressure) {
                             baroBaselinePressure = p;
                         }
                         const relAlt = 44330 * (1 - Math.pow(p / baroBaselinePressure, 0.190295));
@@ -1247,22 +1254,49 @@
                             const v = n % 100;
                             return n + (s[(v - 20) % 10] || s[v] || s[0]);
                         };
-                        const floorLabel = floorNum === 1 ? "1st Floor (Ground)" : `${ordinal(floorNum)} Floor (±3m)`;
-                        
+                        const floorLabel = floorNum === 1 ? "1st Floor (Ground Level)" : `${ordinal(floorNum)} Floor`;
+
+                        // Compute dynamic vertical velocity (m/s) and motion
+                        const now = Date.now();
+                        const dt = (now - lastAltitudeReadingTime) / 1000;
+                        let vel = 0;
+                        let motion = "stationary";
+                        if (dt >= 0.5) {
+                            vel = Math.round(((relAlt - lastAltitudeMeters) / dt) * 10) / 10;
+                            if (vel > 0.25) motion = "ascending";
+                            else if (vel < -0.25) motion = "descending";
+                            lastAltitudeReadingTime = now;
+                            lastAltitudeMeters = relAlt;
+                        }
+
+                        const oldFloor = currentFloorEstimate.floor;
                         currentFloorEstimate = {
                             floor: floorNum,
                             floorLabel: floorLabel,
                             relativeAltitudeMeters: Math.round(relAlt * 10) / 10,
-                            pressureHpa: Math.round(p * 10) / 10
+                            verticalVelocity: Math.abs(vel),
+                            verticalMotion: motion,
+                            pressureHpa: Math.round(p * 10) / 10,
+                            isDynamic: true
                         };
 
                         const badge = document.getElementById('floorStatusBadge');
-                        if (badge) badge.innerText = floorLabel;
+                        if (badge) badge.innerText = `${floorLabel} (±${Math.round(relAlt * 10) / 10}m)`;
+
+                        // Emit live real-time dynamic elevation telemetry to CAD
+                        if (oldFloor !== floorNum || Math.abs(vel) > 0.4) {
+                            if (ws && ws.readyState === WebSocket.OPEN) {
+                                ws.send(JSON.stringify({
+                                    type: "floor_update",
+                                    floor_telemetry: currentFloorEstimate
+                                }));
+                            }
+                        }
                     });
                     barometer.start();
                 }
             } catch (e) {
-                console.log("Barometer sensor initialized in hybrid GPS mode:", e);
+                console.log("Barometer running in hybrid GPS altitude mode:", e);
             }
         }
 
@@ -1278,17 +1312,26 @@
                     const v = n % 100;
                     return n + (s[(v - 20) % 10] || s[v] || s[0]);
                 };
-                const floorLabel = floorNum === 1 ? "1st Floor (Ground)" : `${ordinal(floorNum)} Floor (±3m)`;
+                const floorLabel = floorNum === 1 ? "1st Floor (Ground Level)" : `${ordinal(floorNum)} Floor`;
+
+                const oldFloor = currentFloorEstimate.floor;
                 currentFloorEstimate.floor = floorNum;
                 currentFloorEstimate.floorLabel = floorLabel;
                 currentFloorEstimate.relativeAltitudeMeters = Math.round(relAlt * 10) / 10;
                 
                 const badge = document.getElementById('floorStatusBadge');
-                if (badge) badge.innerText = floorLabel;
+                if (badge) badge.innerText = `${floorLabel} (±${Math.round(relAlt * 10) / 10}m)`;
+
+                if (oldFloor !== floorNum && ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: "floor_update",
+                        floor_telemetry: currentFloorEstimate
+                    }));
+                }
             }
         }
 
-        // Manual Floor Simulation Stepper for Demos & Testing
+        // Developer Demo Simulation Stepper
         function changeFloorManual(delta) {
             let current = currentFloorEstimate.floor || 1;
             let nextFloor = Math.max(1, Math.min(50, current + delta));
@@ -1297,13 +1340,15 @@
                 const v = n % 100;
                 return n + (s[(v - 20) % 10] || s[v] || s[0]);
             };
-            const floorLabel = nextFloor === 1 ? "1st Floor (Ground)" : `${ordinal(nextFloor)} Floor`;
+            const floorLabel = nextFloor === 1 ? "1st Floor (Ground Level)" : `${ordinal(nextFloor)} Floor`;
             currentFloorEstimate.floor = nextFloor;
             currentFloorEstimate.floorLabel = floorLabel;
             currentFloorEstimate.relativeAltitudeMeters = (nextFloor - 1) * 3.0;
+            currentFloorEstimate.verticalMotion = delta > 0 ? "ascending" : (delta < 0 ? "descending" : "stationary");
+            currentFloorEstimate.verticalVelocity = 1.2;
 
             const badge = document.getElementById('floorStatusBadge');
-            if (badge) badge.innerText = floorLabel;
+            if (badge) badge.innerText = `${floorLabel} (+${(nextFloor - 1) * 3}m)`;
 
             // Transmit immediately over WebSocket to central CAD dispatch dashboard
             if (ws && ws.readyState === WebSocket.OPEN) {
