@@ -1238,11 +1238,15 @@
     </div>
 
     <script>
-        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-        const host = window.location.host || "hangon-k31m.onrender.com";
+        const defaultHost = "hangon-k31m.onrender.com";
+        const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+        const isFile = window.location.protocol.startsWith("file");
+        const host = (!isFile && window.location.host) ? window.location.host : defaultHost;
+        const isSecureHost = host.includes("onrender.com") || window.location.protocol === "https:";
+        const protocol = isSecureHost ? "wss:" : "ws:";
         const wsUrl = `${protocol}//${host}/ws/controller`;
 
-        const targetFullUrl = `${window.location.protocol}//${host}/sos`;
+        const targetFullUrl = isFile ? `https://${defaultHost}/sos` : `${window.location.protocol}//${host}/sos`;
         document.getElementById('targetUrlDisplay').innerText = targetFullUrl;
 
         function copyTargetLink() {
@@ -2889,16 +2893,32 @@
                     if (msg.type === "pong") return;
 
                     if (msg.type === "active_targets") {
-                        msg.targets.forEach(targetId => {
-                            ensureTargetSession(targetId);
-                        });
-                        if (msg.targets_data) {
+                        if (msg.targets_data && msg.targets_data.length > 0) {
                             msg.targets_data.forEach(meta => {
-                                if (meta.sos_active) markTargetSosActive(meta.targetId, meta.gps, meta.battery, meta.floor_telemetry, meta.crash_telemetry);
+                                const session = ensureTargetSession(meta.targetId, meta);
+                                if (meta.floor_telemetry) {
+                                    session.floorTelemetry = meta.floor_telemetry;
+                                    const floorEl = document.getElementById(`floor-${meta.targetId}`);
+                                    if (floorEl) floorEl.innerText = meta.floor_telemetry.floorLabel || `${meta.floor_telemetry.floor}th Floor`;
+                                }
+                                if (meta.sos_active) {
+                                    markTargetSosActive(meta.targetId, meta.gps, meta.battery, meta.floor_telemetry, meta.crash_telemetry);
+                                }
+                            });
+                        } else if (msg.targets) {
+                            msg.targets.forEach(targetId => {
+                                ensureTargetSession(targetId);
                             });
                         }
-                    } else if (msg.type === "target_joined") {
-                        ensureTargetSession(msg.targetId);
+                    } else if (msg.type === "target_joined" || msg.type === "target_standby") {
+                        const meta = msg.meta || msg;
+                        const session = ensureTargetSession(msg.targetId, meta);
+                        const ft = meta.floor_telemetry || msg.floor_telemetry;
+                        if (ft) {
+                            session.floorTelemetry = ft;
+                            const floorEl = document.getElementById(`floor-${msg.targetId}`);
+                            if (floorEl) floorEl.innerText = ft.floorLabel || `${ft.floor}th Floor`;
+                        }
                     } else if (msg.type === "target_left") {
                         removeTargetSession(msg.targetId);
                     } else if (msg.type === "sos_alert") {
@@ -2919,7 +2939,7 @@
                             const floorEl = document.getElementById(`floor-${msg.targetId}`);
                             if (floorEl) floorEl.innerText = msg.floor_telemetry.floorLabel || `${msg.floor_telemetry.floor}th Floor`;
                             if (active3DTargetId === msg.targetId) {
-                                renderBuildingFloors(msg.targetId, msg.floor_telemetry.floor || 1);
+                                renderBuildingFloors(msg.targetId, msg.floor_telemetry.floor || 6);
                                 const subTitle = document.getElementById('modal3DSubtitle');
                                 if (subTitle && session.gps) {
                                     subTitle.innerHTML = `INCIDENT TARGET: <b>${msg.targetId}</b> &bull; GPS: ${session.gps.lat.toFixed(5)}, ${session.gps.lng.toFixed(5)} &bull; <span style="color:#00f2fe; font-weight:800;">${msg.floor_telemetry.floorLabel}</span>`;

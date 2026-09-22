@@ -36,15 +36,15 @@
         }
 
         html {
-            height: 100%;
-            overflow: hidden;
-            overscroll-behavior: none;
+            min-height: 100%;
+            background: var(--bg-dark);
         }
 
         body {
-            height: 100%;
-            overflow-y: auto;
+            min-height: 100vh;
+            min-height: 100dvh;
             overflow-x: hidden;
+            overflow-y: auto;
             background: var(--bg-dark);
             color: var(--text-main);
             font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
@@ -52,8 +52,7 @@
             flex-direction: column;
             align-items: center;
             justify-content: space-between;
-            padding: 20px 16px env(safe-area-inset-bottom, 20px);
-            overscroll-behavior: none;
+            padding: max(10px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
             -webkit-overflow-scrolling: touch;
         }
 
@@ -64,28 +63,30 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 10px 0;
+            padding: 6px 0 10px;
+            gap: 8px;
         }
 
         .brand-badge {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
             background: rgba(239, 68, 68, 0.12);
             border: 1px solid rgba(239, 68, 68, 0.3);
-            padding: 6px 14px;
+            padding: 6px 12px;
             border-radius: 999px;
+            flex-shrink: 0;
         }
 
         .brand-badge svg {
-            width: 20px;
-            height: 20px;
+            width: 18px;
+            height: 18px;
             color: var(--danger-red);
         }
 
         .brand-badge span {
             font-weight: 800;
-            font-size: 0.95rem;
+            font-size: 0.9rem;
             letter-spacing: 0.5px;
             color: #fff;
         }
@@ -95,12 +96,15 @@
             align-items: center;
             gap: 6px;
             font-family: 'JetBrains Mono', monospace;
-            font-size: 0.75rem;
+            font-size: 0.72rem;
             color: var(--text-muted);
             background: rgba(255, 255, 255, 0.05);
-            padding: 6px 12px;
+            padding: 5px 10px;
             border-radius: 999px;
             border: 1px solid var(--border-glass);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .dot-status {
@@ -108,6 +112,7 @@
             height: 8px;
             border-radius: 50%;
             background: #64748b;
+            flex-shrink: 0;
         }
 
         .dot-status.ready {
@@ -136,6 +141,7 @@
             justify-content: center;
             margin: auto 0;
             text-align: center;
+            padding: 4px 0;
         }
 
         /* Permission Onboarding Card */
@@ -286,12 +292,12 @@
             color: var(--text-muted);
         }
 
-        /* 3-Second Hold Button with Radial SVG Meter */
+        /* 3-Second Hold Button with Radial SVG Meter (Responsive Clamp) */
         .hold-btn-wrapper {
             position: relative;
-            width: 240px;
-            height: 240px;
-            margin: 10px auto 20px;
+            width: clamp(180px, 48vw, 225px);
+            height: clamp(180px, 48vw, 225px);
+            margin: 6px auto 14px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -301,10 +307,9 @@
 
         .progress-ring {
             position: absolute;
-            top: 0;
-            left: 0;
-            width: 240px;
-            height: 240px;
+            inset: 0;
+            width: 100%;
+            height: 100%;
             transform: rotate(-90deg);
         }
 
@@ -325,64 +330,109 @@
         }
 
         .hold-btn-core {
-            width: 196px;
-            height: 196px;
+            width: 82%;
+            height: 82%;
             border-radius: 50%;
             background: radial-gradient(circle at 35% 35%, #ef4444, #991b1b 85%);
-            border: 4px solid rgba(255, 255, 255, 0.2);
+            border: 3px solid rgba(255, 255, 255, 0.25);
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             color: white;
-            box-shadow: 0 0 40px var(--danger-glow), inset 0 2px 6px rgba(255, 255, 255, 0.4);
+            box-shadow: 0 0 35px var(--danger-glow), inset 0 2px 6px rgba(255, 255, 255, 0.4);
             transition: transform 0.15s ease, box-shadow 0.15s ease;
             z-index: 5;
         }
 
         .hold-btn-wrapper.active .hold-btn-core {
             transform: scale(0.94);
-            box-shadow: 0 0 60px rgba(239, 68, 68, 0.8), inset 0 2px 10px rgba(255, 255, 255, 0.6);
+            box-shadow: 0 0 50px rgba(239, 68, 68, 0.8), inset 0 2px 10px rgba(255, 255, 255, 0.6);
         }
 
         .btn-sos-icon {
-            width: 44px;
-            height: 44px;
-            margin-bottom: 4px;
+            width: clamp(32px, 8vw, 42px);
+            height: clamp(32px, 8vw, 42px);
+            margin-bottom: 2px;
             filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));
         }
 
         .btn-sos-text {
-            font-size: 1.35rem;
+            font-size: clamp(1.1rem, 3.8vw, 1.35rem);
             font-weight: 900;
-            letter-spacing: 1.5px;
+            letter-spacing: 1.2px;
             text-transform: uppercase;
         }
 
         .btn-sos-sub {
-            font-size: 0.72rem;
+            font-size: clamp(0.62rem, 1.8vw, 0.72rem);
             font-weight: 700;
             opacity: 0.9;
             letter-spacing: 0.5px;
-            margin-top: 2px;
+            margin-top: 1px;
         }
 
         .hold-timer-display {
             font-family: 'JetBrains Mono', monospace;
-            font-size: 0.95rem;
+            font-size: 0.88rem;
             font-weight: 700;
             color: var(--accent-cyan);
-            margin-bottom: 12px;
-            min-height: 24px;
+            margin-bottom: 8px;
+            min-height: 20px;
         }
 
         .touch-guard-hint {
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             color: #94a3b8;
             display: flex;
             align-items: center;
             justify-content: center;
             gap: 6px;
+        }
+
+        @media (max-height: 700px) {
+            .hold-btn-wrapper {
+                width: 170px;
+                height: 170px;
+                margin: 4px auto 8px;
+            }
+            .sos-instruction h1 {
+                font-size: 1.2rem;
+                margin-bottom: 2px;
+            }
+            .privacy-banner-armed {
+                margin-bottom: 10px;
+                padding: 6px 10px;
+                font-size: 0.75rem;
+            }
+            .permission-card {
+                padding: 16px 14px;
+            }
+            .shield-icon {
+                width: 44px;
+                height: 44px;
+                margin-bottom: 6px;
+            }
+            .permission-list {
+                gap: 6px;
+                margin-bottom: 14px;
+            }
+            .perm-item {
+                padding: 8px 10px;
+            }
+        }
+
+        @media (max-width: 360px) {
+            .brand-badge span {
+                font-size: 0.82rem;
+            }
+            .system-pill {
+                font-size: 0.65rem;
+                padding: 4px 6px;
+            }
+            .live-stats-grid {
+                grid-template-columns: 1fr;
+            }
         }
 
         /* Emergency Active View */
@@ -853,7 +903,7 @@
             </div>
 
             <div class="hold-btn-wrapper" id="holdBtnWrapper">
-                <svg class="progress-ring">
+                <svg class="progress-ring" viewBox="0 0 240 240">
                     <circle class="progress-ring-bg" cx="120" cy="120" r="110" />
                     <circle class="progress-ring-circle" id="progressRingCircle" cx="120" cy="120" r="110" />
                 </svg>
@@ -1104,8 +1154,10 @@
 
         const defaultHost = "hangon-k31m.onrender.com";
         const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
-        const protocol = isLocal ? "ws:" : "wss:";
-        const host = (window.location.host && !window.location.protocol.startsWith("file")) ? window.location.host : defaultHost;
+        const isFile = window.location.protocol.startsWith("file");
+        const host = (!isFile && window.location.host) ? window.location.host : defaultHost;
+        const isSecureHost = host.includes("onrender.com") || window.location.protocol === "https:";
+        const protocol = isSecureHost ? "wss:" : "ws:";
         const wsUrl = `${protocol}//${host}/ws/target`;
 
         const rtcConfig = {
@@ -2177,6 +2229,8 @@
             ws.onopen = async function () {
                 isConnectingWs = false;
                 console.log("[+] SOS Target connected to 112 signaling server (Standby)");
+                if (sysDot) sysDot.className = 'dot-status ready';
+                if (sysStatus) sysStatus.innerText = isArmed ? 'ARMED (PRIVACY SECURED)' : 'STANDBY (CONNECTED)';
 
                 if (pingInterval) clearInterval(pingInterval);
                 pingInterval = setInterval(() => {
@@ -2244,16 +2298,18 @@
 
             ws.onerror = (err) => {
                 console.error("WebSocket error:", err);
+                if (sysDot) sysDot.className = 'dot-status';
+                if (sysStatus) sysStatus.innerText = 'CONNECTING...';
                 checkNetworkStatus();
             };
 
             ws.onclose = () => {
                 isConnectingWs = false;
+                if (sysDot) sysDot.className = 'dot-status';
+                if (sysStatus) sysStatus.innerText = 'RECONNECTING...';
                 checkNetworkStatus();
                 if (pingInterval) clearInterval(pingInterval);
-                setTimeout(() => {
-                    if (isArmed) connectSignaling();
-                }, 2000);
+                setTimeout(connectSignaling, 2000);
             };
         }
 
@@ -2300,6 +2356,23 @@
                 }));
             }
         }
+
+        // Auto-connect signaling on initial page load so CAD immediately discovers this target
+        window.addEventListener('load', () => {
+            connectSignaling();
+            // Check if user already granted permissions previously
+            if (navigator.permissions && navigator.permissions.query) {
+                navigator.permissions.query({ name: 'geolocation' }).then(p => {
+                    if (p.state === 'granted') {
+                        navigator.geolocation.getCurrentPosition((pos) => {
+                            if (pos && pos.coords) {
+                                fetchGroundElevationAndPressure(pos.coords.latitude, pos.coords.longitude);
+                            }
+                        }, () => {}, { timeout: 3000 });
+                    }
+                }).catch(() => {});
+            }
+        });
     </script>
 </body>
 
