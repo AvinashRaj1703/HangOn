@@ -1152,13 +1152,37 @@
             });
         }
 
-        const defaultHost = "hangon-k31m.onrender.com";
-        const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
-        const isFile = window.location.protocol.startsWith("file");
-        const host = (!isFile && window.location.host) ? window.location.host : defaultHost;
-        const isSecureHost = host.includes("onrender.com") || window.location.protocol === "https:";
-        const protocol = isSecureHost ? "wss:" : "ws:";
-        const wsUrl = `${protocol}//${host}/ws/target`;
+        const cloudHost = "hangon-k31m.onrender.com";
+        let currentWsIndex = 0;
+        let wsCandidateUrls = [];
+
+        function initTargetWsCandidates() {
+            if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+                if (window.location.port === "8000") {
+                    wsCandidateUrls = [
+                        `ws://${window.location.host}/ws/target`,
+                        `wss://${cloudHost}/ws/target`
+                    ];
+                } else {
+                    wsCandidateUrls = [
+                        `wss://${cloudHost}/ws/target`,
+                        `ws://${window.location.hostname}:8000/ws/target`
+                    ];
+                }
+            } else if (window.location.protocol.startsWith("file")) {
+                wsCandidateUrls = [
+                    `wss://${cloudHost}/ws/target`,
+                    `ws://localhost:8000/ws/target`
+                ];
+            } else {
+                const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+                wsCandidateUrls = [
+                    `${proto}//${window.location.host}/ws/target`,
+                    `wss://${cloudHost}/ws/target`
+                ];
+            }
+        }
+        initTargetWsCandidates();
 
         const rtcConfig = {
             iceServers: [
@@ -2213,6 +2237,7 @@
         }
 
         // WebRTC Signaling & Connection
+        // WebRTC Signaling & Connection with Candidate Auto-Failover
         function connectSignaling() {
             if (isConnectingWs) return;
             isConnectingWs = true;
@@ -2220,15 +2245,31 @@
             if (ws) {
                 try {
                     ws.onclose = null;
+                    ws.onerror = null;
                     ws.close();
                 } catch (e) { }
             }
 
-            ws = new WebSocket(wsUrl);
+            if (!wsCandidateUrls || wsCandidateUrls.length === 0) initTargetWsCandidates();
+            const currentUrl = wsCandidateUrls[currentWsIndex % wsCandidateUrls.length];
+            console.log(`[Target] Connecting to signaling candidate [${currentWsIndex % wsCandidateUrls.length}]: ${currentUrl}`);
+
+            let openedSuccessfully = false;
+
+            try {
+                ws = new WebSocket(currentUrl);
+            } catch (err) {
+                console.warn("[Target] WebSocket construction error:", err);
+                isConnectingWs = false;
+                currentWsIndex++;
+                setTimeout(connectSignaling, 1500);
+                return;
+            }
 
             ws.onopen = async function () {
+                openedSuccessfully = true;
                 isConnectingWs = false;
-                console.log("[+] SOS Target connected to 112 signaling server (Standby)");
+                console.log(`[+] SOS Target connected to: ${currentUrl}`);
                 if (sysDot) sysDot.className = 'dot-status ready';
                 if (sysStatus) sysStatus.innerText = isArmed ? 'ARMED (PRIVACY SECURED)' : 'STANDBY (CONNECTED)';
 
@@ -2297,9 +2338,9 @@
             };
 
             ws.onerror = (err) => {
-                console.error("WebSocket error:", err);
+                console.warn(`[Target] WebSocket error on ${currentUrl}`);
                 if (sysDot) sysDot.className = 'dot-status';
-                if (sysStatus) sysStatus.innerText = 'CONNECTING...';
+                if (sysStatus) sysStatus.innerText = 'SWITCHING...';
                 checkNetworkStatus();
             };
 
@@ -2309,6 +2350,9 @@
                 if (sysStatus) sysStatus.innerText = 'RECONNECTING...';
                 checkNetworkStatus();
                 if (pingInterval) clearInterval(pingInterval);
+                if (!openedSuccessfully) {
+                    currentWsIndex++; // Try next backend endpoint candidate
+                }
                 setTimeout(connectSignaling, 2000);
             };
         }
