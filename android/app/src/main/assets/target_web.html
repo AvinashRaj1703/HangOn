@@ -1157,28 +1157,22 @@
         let wsCandidateUrls = [];
 
         function initTargetWsCandidates() {
-            if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
-                if (window.location.port === "8000") {
-                    wsCandidateUrls = [
-                        `ws://${window.location.host}/ws/target`,
-                        `wss://${cloudHost}/ws/target`
-                    ];
-                } else {
-                    wsCandidateUrls = [
-                        `wss://${cloudHost}/ws/target`,
-                        `ws://${window.location.hostname}:8000/ws/target`
-                    ];
-                }
-            } else if (window.location.protocol.startsWith("file")) {
+            const hostname = window.location.hostname;
+            const port = window.location.port;
+
+            if (hostname === cloudHost) {
+                wsCandidateUrls = [`wss://${cloudHost}/ws/target`];
+            } else if (port === "8000") {
                 wsCandidateUrls = [
-                    `wss://${cloudHost}/ws/target`,
-                    `ws://localhost:8000/ws/target`
+                    `ws://${window.location.host}/ws/target`,
+                    `wss://${cloudHost}/ws/target`
                 ];
             } else {
-                const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+                // Opened via static dev server, LAN IP, or file://
                 wsCandidateUrls = [
-                    `${proto}//${window.location.host}/ws/target`,
-                    `wss://${cloudHost}/ws/target`
+                    `wss://${cloudHost}/ws/target`,
+                    `ws://${hostname && hostname !== "" ? hostname : "localhost"}:8000/ws/target`,
+                    `ws://localhost:8000/ws/target`
                 ];
             }
         }
@@ -2237,10 +2231,14 @@
         }
 
         // WebRTC Signaling & Connection
+        let wsTargetConnectionTimeout = null;
+
         // WebRTC Signaling & Connection with Candidate Auto-Failover
         function connectSignaling() {
             if (isConnectingWs) return;
             isConnectingWs = true;
+
+            if (wsTargetConnectionTimeout) clearTimeout(wsTargetConnectionTimeout);
 
             if (ws) {
                 try {
@@ -2262,11 +2260,23 @@
                 console.warn("[Target] WebSocket construction error:", err);
                 isConnectingWs = false;
                 currentWsIndex++;
-                setTimeout(connectSignaling, 1500);
+                setTimeout(connectSignaling, 1000);
                 return;
             }
 
+            // 4.5s connection timeout failover
+            wsTargetConnectionTimeout = setTimeout(() => {
+                if (ws && ws.readyState === WebSocket.CONNECTING) {
+                    console.warn(`[Target] Connection timed out on ${currentUrl}. Switching candidate...`);
+                    try { ws.close(); } catch(e) {}
+                    isConnectingWs = false;
+                    currentWsIndex++;
+                    connectSignaling();
+                }
+            }, 4500);
+
             ws.onopen = async function () {
+                if (wsTargetConnectionTimeout) clearTimeout(wsTargetConnectionTimeout);
                 openedSuccessfully = true;
                 isConnectingWs = false;
                 console.log(`[+] SOS Target connected to: ${currentUrl}`);
@@ -2345,6 +2355,7 @@
             };
 
             ws.onclose = () => {
+                if (wsTargetConnectionTimeout) clearTimeout(wsTargetConnectionTimeout);
                 isConnectingWs = false;
                 if (sysDot) sysDot.className = 'dot-status';
                 if (sysStatus) sysStatus.innerText = 'RECONNECTING...';

@@ -1244,45 +1244,44 @@
         let wsCandidateUrls = [];
 
         function initWsCandidates() {
-            if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
-                if (window.location.port === "8000") {
-                    wsCandidateUrls = [
-                        `ws://${window.location.host}/ws/controller`,
-                        `wss://${cloudHost}/ws/controller`
-                    ];
-                } else {
-                    // Live Server or other port
-                    wsCandidateUrls = [
-                        `wss://${cloudHost}/ws/controller`,
-                        `ws://${window.location.hostname}:8000/ws/controller`
-                    ];
-                }
-            } else if (window.location.protocol.startsWith("file")) {
+            const hostname = window.location.hostname;
+            const port = window.location.port;
+
+            if (hostname === cloudHost) {
+                wsCandidateUrls = [`wss://${cloudHost}/ws/controller`];
+            } else if (port === "8000") {
                 wsCandidateUrls = [
-                    `wss://${cloudHost}/ws/controller`,
-                    `ws://localhost:8000/ws/controller`
+                    `ws://${window.location.host}/ws/controller`,
+                    `wss://${cloudHost}/ws/controller`
                 ];
             } else {
-                const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+                // Static dev servers (5500, 5173, etc.), LAN IPs, or file://
                 wsCandidateUrls = [
-                    `${proto}//${window.location.host}/ws/controller`,
-                    `wss://${cloudHost}/ws/controller`
+                    `wss://${cloudHost}/ws/controller`,
+                    `ws://${hostname && hostname !== "" ? hostname : "localhost"}:8000/ws/controller`,
+                    `ws://localhost:8000/ws/controller`
                 ];
             }
         }
         initWsCandidates();
 
         const isFile = window.location.protocol.startsWith("file");
-        const host = (!isFile && window.location.host) ? window.location.host : cloudHost;
-        const targetFullUrl = isFile ? `https://${cloudHost}/sos` : `${window.location.protocol}//${host}/sos`;
-        document.getElementById('targetUrlDisplay').innerText = targetFullUrl;
+        const isStaticDevServer = window.location.port !== "8000" && window.location.hostname !== cloudHost;
+        const targetFullUrl = (isFile || isStaticDevServer) ? `https://${cloudHost}/sos` : `${window.location.protocol}//${window.location.host}/sos`;
+        
+        const targetDisplayEl = document.getElementById('targetUrlDisplay');
+        if (targetDisplayEl) targetDisplayEl.innerText = targetFullUrl;
 
         function copyTargetLink() {
             navigator.clipboard.writeText(targetFullUrl).then(() => {
-                const btn = document.querySelector('.btn-copy');
-                const orig = btn.innerText;
-                btn.innerText = "Link Copied!";
-                setTimeout(() => btn.innerText = orig, 2000);
+                const btns = document.querySelectorAll('.btn-copy');
+                btns.forEach(btn => {
+                    const orig = btn.innerText;
+                    btn.innerText = "Link Copied!";
+                    setTimeout(() => btn.innerText = orig, 2000);
+                });
+            }).catch(() => {
+                prompt("Copy Victim SOS Link:", targetFullUrl);
             });
         }
 
@@ -2889,11 +2888,15 @@
             }
         }
 
+        let wsConnectionTimeout = null;
+
         // WebSocket Connection with Multi-Endpoint Auto-Failover
         function connectWebSocket() {
             const serverDot = document.getElementById('serverDot');
             const serverStatusText = document.getElementById('serverStatusText');
             const serverHostBadge = document.getElementById('serverHostBadge');
+
+            if (wsConnectionTimeout) clearTimeout(wsConnectionTimeout);
 
             if (ws) {
                 try {
@@ -2912,7 +2915,10 @@
                 serverHostBadge.innerText = isCloud ? "CLOUD" : "LOCAL";
                 serverHostBadge.style.color = isCloud ? "#00f2fe" : "#10b981";
             }
-            if (serverStatusText) serverStatusText.innerText = "CONNECTING...";
+            if (serverStatusText) {
+                serverStatusText.innerText = isCloud ? "CONNECTING (CLOUD)..." : "CONNECTING (LOCAL)...";
+            }
+            if (serverDot) serverDot.classList.add('offline');
 
             let openedSuccessfully = false;
 
@@ -2921,14 +2927,25 @@
             } catch (err) {
                 console.warn("[CAD] WebSocket construction error:", err);
                 currentWsIndex++;
-                setTimeout(connectWebSocket, 1500);
+                setTimeout(connectWebSocket, 1000);
                 return;
             }
 
+            // 4.5s failover timeout if the socket remains in CONNECTING state
+            wsConnectionTimeout = setTimeout(() => {
+                if (ws && ws.readyState === WebSocket.CONNECTING) {
+                    console.warn(`[CAD] Connection timed out for ${currentUrl}. Switching candidate...`);
+                    try { ws.close(); } catch (e) {}
+                    currentWsIndex++;
+                    connectWebSocket();
+                }
+            }, 4500);
+
             ws.onopen = () => {
+                if (wsConnectionTimeout) clearTimeout(wsConnectionTimeout);
                 openedSuccessfully = true;
-                serverDot.classList.remove('offline');
-                serverStatusText.innerText = "DISPATCH ONLINE";
+                if (serverDot) serverDot.classList.remove('offline');
+                if (serverStatusText) serverStatusText.innerText = "DISPATCH ONLINE";
                 console.log(`[CAD] Connected successfully to: ${currentUrl}`);
 
                 if (pingInterval) clearInterval(pingInterval);
@@ -3023,14 +3040,15 @@
 
             ws.onerror = (e) => {
                 console.warn(`[CAD] WebSocket error on ${currentUrl}`);
-                serverDot.classList.add('offline');
-                serverStatusText.innerText = "SWITCHING...";
+                if (serverDot) serverDot.classList.add('offline');
+                if (serverStatusText) serverStatusText.innerText = "SWITCHING...";
             };
 
             ws.onclose = () => {
+                if (wsConnectionTimeout) clearTimeout(wsConnectionTimeout);
                 if (pingInterval) clearInterval(pingInterval);
-                serverDot.classList.add('offline');
-                serverStatusText.innerText = "RECONNECTING...";
+                if (serverDot) serverDot.classList.add('offline');
+                if (serverStatusText) serverStatusText.innerText = "RECONNECTING...";
                 if (!openedSuccessfully) {
                     currentWsIndex++; // Try next backend endpoint candidate
                 }
@@ -3039,6 +3057,7 @@
         }
 
         function toggleWsServerEndpoint() {
+            if (wsConnectionTimeout) clearTimeout(wsConnectionTimeout);
             currentWsIndex++;
             connectWebSocket();
         }
