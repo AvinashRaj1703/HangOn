@@ -1864,7 +1864,8 @@
             if (session && session.gps && session.gps.lat && session.gps.lng) {
                 lat = session.gps.lat;
                 lng = session.gps.lng;
-              const curFloor = (session && session.floorTelemetry && session.floorTelemetry.floor) ? session.floorTelemetry.floor : 6;
+            }
+            const curFloor = (session && session.floorTelemetry && session.floorTelemetry.floor) ? session.floorTelemetry.floor : 6;
             const floorLabel = (session && session.floorTelemetry && session.floorTelemetry.floorLabel) ? session.floorTelemetry.floorLabel : "6th Floor";
 
             if (subTitle) {
